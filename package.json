@@ -1,0 +1,56 @@
+{
+  "name": "@autoschedule/queries-scheduler",
+  "version": "0.0.0-development",
+  "description": "Queries scheduler",
+  "main": "index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "ava": "ava build/test.*.js",
+    "test": "tslint -p ./ && tsc && nyc npm run ava",
+    "build": "webpack",
+    "prepublish": "npm run build",
+    "semantic-release": "semantic-release pre && npm publish && semantic-release post",
+    "watch:ts": "tsc -w",
+    "watch:ava": "ava -w build/test.*.js",
+    "watch:test": "concurrently -k -p \"[{name}]\" -n \"TypeScript,Ava\" -c \"blue.bold,magenta.bold\" \"npm run watch:ts\" \"npm run watch:ava\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AutoScheduleJS/queries-scheduler.git"
+  },
+  "private": false,
+  "publishConfig": {
+    "tag": "dev",
+    "access": "public"
+  },
+  "keywords": [
+    "scheduler",
+    "autoschedule"
+  ],
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/AutoScheduleJS/queries-scheduler/issues"
+  },
+  "homepage": "https://github.com/AutoScheduleJS/queries-scheduler#readme",
+  "devDependencies": {
+    "@semantic-release/release-notes-generator": "^4.0.5",
+    "ava": "^0.22.0",
+    "concurrently": "^3.5.0",
+    "cz-conventional-changelog": "^2.0.0",
+    "nyc": "^11.2.1",
+    "prettier": "^1.7.4",
+    "semantic-release": "^8.2.0",
+    "ts-loader": "^3.0.5",
+    "tslint": "^5.8.0",
+    "tslint-config-prettier": "^1.6.0",
+    "typedoc": "^0.9.0",
+    "typedoc-webpack-plugin": "^1.1.4",
+    "typescript": "^2.5.3",
+    "webpack": "^3.8.1"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  }
+}
