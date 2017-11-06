@@ -5,13 +5,13 @@
   "main": "index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "ava": "ava build/test.*.js",
+    "ava": "ava build/.*.test.js",
     "test": "tslint -p ./ && tsc && nyc npm run ava",
     "build": "webpack",
     "prepublish": "npm run build",
     "semantic-release": "semantic-release pre && npm publish && semantic-release post",
     "watch:ts": "tsc -w",
-    "watch:ava": "ava -w build/test.*.js",
+    "watch:ava": "ava -w build/.*.test.js",
     "watch:test": "concurrently -k -p \"[{name}]\" -n \"TypeScript,Ava\" -c \"blue.bold,magenta.bold\" \"npm run watch:ts\" \"npm run watch:ava\""
   },
   "repository": {
@@ -32,20 +32,28 @@
     "url": "https://github.com/AutoScheduleJS/queries-scheduler/issues"
   },
   "homepage": "https://github.com/AutoScheduleJS/queries-scheduler#readme",
+  "dependencies": {
+    "moment": "^2.19.1",
+    "moment-range": "^3.0.3",
+    "ramda": "^0.25.0",
+    "rxjs": "^5.5.2"
+  },
   "devDependencies": {
     "@semantic-release/release-notes-generator": "^5.0.1",
+    "@types/moment-range": "^3.0.4",
+    "@types/ramda": "github:types/npm-ramda#dist",
     "ava": "^0.23.0",
     "concurrently": "^3.5.0",
-    "cz-conventional-changelog": "^2.0.0",
-    "nyc": "^11.2.1",
+    "cz-conventional-changelog": "^2.1.0",
+    "nyc": "^11.3.0",
     "prettier": "^1.7.4",
     "semantic-release": "^8.2.0",
-    "ts-loader": "^3.0.5",
+    "ts-loader": "^3.1.1",
     "tslint": "^5.8.0",
     "tslint-config-prettier": "^1.6.0",
     "typedoc": "^0.9.0",
     "typedoc-webpack-plugin": "^1.1.4",
-    "typescript": "^2.5.3",
+    "typescript": "^2.6.1",
     "webpack": "^3.8.1"
   },
   "config": {
