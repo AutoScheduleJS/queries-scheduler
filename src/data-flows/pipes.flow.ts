@@ -10,6 +10,7 @@ import {
 	identity,
 	ifElse,
 	isNil,
+	map,
 	maxBy,
 	partial,
 	pathOr,
@@ -26,6 +27,8 @@ import {
 	without,
 } from 'ramda';
 
+import * as moment from 'moment';
+
 import { IConfig } from '../data-structures/config.interface';
 import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
@@ -39,6 +42,8 @@ import { computePressureChunks } from './environment.flows';
 type maskFn = (tm: IRange) => IRange[];
 type mapRange = (r: IRange[], tm: IRange) => IRange[];
 type toNumber = (o: any) => number;
+type getFirstFn = (rest: IRange) => IRange;
+type unfoldRange = (seed: IRange) => false | [IRange, IRange];
 
 export const queriesToPipeline = (config: IConfig, queries: IQuery[]): IMaterial[] => {
 	const potentials = queriesToPotentialities(config, queries);
@@ -93,15 +98,71 @@ const mapToTimeRestriction = curry(
 	},
 );
 
-const mapToMonthRange = (ranges: IRange[], mask: IRange): IRange[] => {
-	return [];
+const mapToMonthRange = (restricts: IRange[], mask: IRange): IRange[] => {
+	const end = +moment(mask.end).endOf('day');
+	return restrictsToRanges(getFirstMonthRange(mask), rangesUnfolder(end, 'year'), restricts);
 };
-const mapToWeekdayRange = (ranges: IRange[], mask: IRange): IRange[] => {
-	return [];
+
+const getFirstMonthRange = curry((mask: IRange, restrict: IRange): IRange => {
+	const startOfYear = +moment(mask.start).startOf('year');
+	const start = +addDecimalMonthTo(startOfYear, restrict.start);
+	const end = +addDecimalMonthTo(startOfYear, restrict.end);
+	return { start, end };
+});
+
+const mapToWeekdayRange = (restricts: IRange[], mask: IRange): IRange[] => {
+	const end = +moment(mask.end).endOf('day');
+	return restrictsToRanges(getFirstWeekdayRange(mask), rangesUnfolder(end, 'week'), restricts);
 };
-const mapToHourRange = (ranges: IRange[], mask: IRange): IRange[] => {
-	return [];
+
+const getFirstWeekdayRange = curry((mask: IRange, restrict: IRange): IRange => {
+	const startOfWeek = +moment(mask.start).startOf('week');
+	const start = +addDecimalDayTo(startOfWeek, restrict.start);
+	const end = +addDecimalDayTo(startOfWeek, restrict.end);
+	return { start, end };
+});
+
+const mapToHourRange = (restricts: IRange[], mask: IRange): IRange[] => {
+	const end = +moment(mask.end).endOf('day');
+	return restrictsToRanges(getFirstHourRange(mask), rangesUnfolder(end, 'day'), restricts);
 };
+
+const restrictsToRanges = (getFirst: getFirstFn, unfoldFn: unfoldRange, restricts: IRange[]) => {
+	return unnest(restricts.map(pipe(getFirst, unfold(unfoldFn))));
+};
+
+const addDecimalDayTo = (date: number, days: number) =>
+	moment(date)
+		.add(Math.floor(days), 'day')
+		.add((days % 1) * 24, 'hour');
+const addDecimalMonthTo = (date: number, month: number) => {
+	const mDate = moment(date).add(Math.floor(month), 'month');
+	return mDate.add((month % 1) * mDate.daysInMonth(), 'day');
+};
+const addToTimestamp = (
+	nb: moment.DurationInputArg1,
+	kind: moment.unitOfTime.DurationConstructor,
+) => (ts: number) => +moment(ts).add(nb, kind);
+
+const rangesUnfolder = (end: number, kind: moment.unitOfTime.DurationConstructor) => (
+	range: IRange,
+): false | [IRange, IRange] => {
+	const nextRange = map(addToTimestamp(1, kind), range);
+	if (range.start >= end) {
+		return false;
+	}
+	return [nextRange, nextRange];
+};
+
+const getFirstHourRange = curry((mask: IRange, restrict: IRange): IRange => {
+	const start = +moment(mask.start)
+		.startOf('day')
+		.add(restrict.start, 'hour');
+	const end = +moment(mask.start)
+		.startOf('day')
+		.add(restrict.end, 'hour');
+	return { start, end };
+});
 
 const getMaskFilterFn = (tr: ITimeRestriction, mapFn: mapRange): maskFn => {
 	return converge(
