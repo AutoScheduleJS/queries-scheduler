@@ -5,20 +5,22 @@ import {
 	applySpec,
 	converge,
 	curry,
+	divide,
 	has,
 	identity,
 	ifElse,
 	isNil,
 	maxBy,
 	partial,
-	path,
+	pathOr,
 	pipe,
 	prop,
 	reduce,
 	reject,
 	sortBy,
+	subtract,
 	sum,
-	unapply,
+	times,
 	unfold,
 	unnest,
 	without,
@@ -28,7 +30,7 @@ import { IConfig } from '../data-structures/config.interface';
 import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
-import { RestrictionCondition } from '../data-structures/query.enum';
+import { GoalKind, RestrictionCondition } from '../data-structures/query.enum';
 import { IQuery, ITimeRestriction } from '../data-structures/query.interface';
 import { IRange } from '../data-structures/range.interface';
 
@@ -36,7 +38,7 @@ import { computePressureChunks } from './environment.flows';
 
 type maskFn = (tm: IRange) => IRange[];
 type mapRange = (r: IRange[], tm: IRange) => IRange[];
-type queryToPot = (q: IQuery) => IPotentiality[];
+type toNumber = (o: any) => number;
 
 export const queriesToPipeline = (config: IConfig, queries: IQuery[]): IMaterial[] => {
 	const potentials = queriesToPotentialities(config, queries);
@@ -68,7 +70,7 @@ const queriesToPotentialities = (config: IConfig, queries: IQuery[]): IPotential
 	return unnest(
 		queries.map(
 			converge(updateChildren, [
-				ifElse(has('goal'), goalToPotentiality, atomicToPotentiality(config)),
+				ifElse(has('goal'), goalToPotentiality(config), atomicToPotentiality(config)),
 				queryToMask(config),
 			]),
 		),
@@ -148,24 +150,51 @@ const updateChildren = (potentials: IPotentiality[], mask: IRange[]): IPotential
 	);
 };
 
-const goalToPotentiality = (query: IQuery): IPotentiality[] => {
-	return [];
+const ifHasStartEnd = ifElse(and(has('start'), has('end')));
+const queryIsSplittable = (query: IQuery) =>
+	query.goal ? query.goal.kind === GoalKind.Splittable : false;
+const getTarget: (s: string) => toNumber = kind => pathOr(0, [kind, 'target']);
+const qStart: toNumber = getTarget('start');
+const qEnd: toNumber = getTarget('end');
+const qDuration: toNumber = getTarget('duration');
+const gQuantity: toNumber = pathOr(1, ['goal', 'quantity']);
+const gtime: toNumber = pathOr(0, ['goal', 'time']);
+
+const goalToDuration = ifElse(queryIsSplittable, gQuantity, qDuration);
+const goalToTimeloop = ifElse(queryIsSplittable, gtime, converge(divide, [gtime, gQuantity]));
+
+const goalToSubpipes = (config: IConfig, query: IQuery): IRange[] => {
+	const start = config.startDate;
+	const timeloop = goalToTimeloop(query);
+	const maxDuration = config.endDate - config.startDate;
+	const subpipeCount = Math.floor(maxDuration / timeloop);
+	return times(
+		i => ({ start: start + timeloop * i, end: start - 1 + timeloop * (i + 1) }),
+		subpipeCount,
+	);
 };
 
-const atomicToPotentiality = (config: IConfig) => {
-	const t = converge(
-		unapply(
-			applySpec<IPotentiality>({
-				children: path(['0', '1']),
-				duration: path(['0', '0']),
-				name: path(['1']),
-				potentiel: always(-1),
-			}),
-		),
-		[
-			ifElse(and(has('start'), has('end')), always([0, []]), always([0, []])),
-			(q: IQuery) => `${q.name}-atomic`,
-		],
+const goalToPotentiality = curry((config: IConfig, query: IQuery): IPotentiality[] => {
+	const duration = goalToDuration(query);
+	const subpipes = goalToSubpipes(config, query);
+	return subpipes.map((mask, i) => ({
+		children: [mask],
+		duration,
+		name: `${query.name}-goal-${i}`,
+		potentiel: -1,
+	}));
+});
+
+const atomicToDuration = ifHasStartEnd(converge(subtract, [qEnd, qStart]), qDuration);
+const atomicToChildren = (c: IConfig) =>
+	ifHasStartEnd(
+		applySpec<IRange>({ start: qStart, end: qEnd }),
+		always<IRange>({ start: c.startDate, end: c.endDate }),
 	);
-	return t;
-};
+
+const atomicToPotentiality = curry((config: IConfig, query: IQuery): IPotentiality[] => {
+	const duration = atomicToDuration(query);
+	const children = [atomicToChildren(config)(query)];
+	const name = `${query.name}-atomic`;
+	return [{ children, duration, name, potentiel: -1 }];
+});
