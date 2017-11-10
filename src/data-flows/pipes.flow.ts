@@ -1,8 +1,10 @@
 import {
+	__,
 	always,
 	and,
 	aperture,
 	applySpec,
+	assoc,
 	converge,
 	curry,
 	divide,
@@ -34,7 +36,7 @@ import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
 import { GoalKind, RestrictionCondition } from '../data-structures/query.enum';
-import { IQuery, ITimeRestriction } from '../data-structures/query.interface';
+import { IQuery, ITimeBoundary, ITimeRestriction } from '../data-structures/query.interface';
 import { IRange } from '../data-structures/range.interface';
 
 import { computePressureChunks } from './environment.flows';
@@ -44,6 +46,7 @@ type mapRange = (r: IRange[], tm: IRange) => IRange[];
 type toNumber = (o: any) => number;
 type getFirstFn = (rest: IRange) => IRange;
 type unfoldRange = (seed: IRange) => false | [IRange, IRange];
+type toTimeBound = (o: any) => ITimeBoundary;
 
 export const queriesToPipeline = (config: IConfig, queries: IQuery[]): IMaterial[] => {
 	const potentials = queriesToPotentialities(config, queries);
@@ -54,7 +57,7 @@ const pipelineUnfolder = (potentials: IPotentiality[]): false | [IMaterial, IPot
 	if (potentials.length < 1) {
 		return false;
 	}
-	const toPlace = reduce(maxBy<IPotentiality>(prop('potentiel')), potentials[0], potentials);
+	const toPlace = reduce(maxBy<IPotentiality>(prop('pressure')), potentials[0], potentials);
 	const newPotentials = without([toPlace], potentials);
 	const material = materializePotentiality(computePressureChunks(toPlace, newPotentials));
 	return [material, updatePotentialsPressure(material, newPotentials)];
@@ -206,9 +209,14 @@ const updateChildren = (potentials: IPotentiality[], mask: IRange[]): IPotential
 	return potentials.map(
 		pipe(
 			p => ({ ...p, children: maskRangeUnion(mask, p.children[0]) }),
-			p => ({ ...p, potentiel: p.duration / sum(p.children.map(c => c.end - c.start)) }),
+			p => ({ ...p, pressure: computePressure(p) }),
 		),
 	);
+};
+
+const computePressure = (p: IPotentiality): number => {
+	const space = sum(p.children.map(c => c.end - c.start));
+	return (p.duration.min || 0 + (p.duration.target || 0)) / 2 * space;
 };
 
 const ifHasStartEnd = ifElse(and(has('start'), has('end')));
@@ -217,12 +225,13 @@ const queryIsSplittable = (query: IQuery) =>
 const getTarget: (s: string) => toNumber = kind => pathOr(0, [kind, 'target']);
 const qStart: toNumber = getTarget('start');
 const qEnd: toNumber = getTarget('end');
-const qDuration: toNumber = getTarget('duration');
-const gQuantity: toNumber = pathOr(1, ['goal', 'quantity']);
+const qDuration: toTimeBound = pathOr({}, ['duration']);
+const gQuantity: toTimeBound = pathOr({}, ['goal', 'quantity']);
+const gQuantityTarget: toNumber = pipe(gQuantity, pathOr(1, ['target']) as toNumber);
 const gtime: toNumber = pathOr(0, ['goal', 'time']);
 
 const goalToDuration = ifElse(queryIsSplittable, gQuantity, qDuration);
-const goalToTimeloop = ifElse(queryIsSplittable, gtime, converge(divide, [gtime, gQuantity]));
+const goalToTimeloop = ifElse(queryIsSplittable, gtime, converge(divide, [gtime, gQuantityTarget]));
 
 const goalToSubpipes = (config: IConfig, query: IQuery): IRange[] => {
 	const start = config.startDate;
@@ -242,11 +251,14 @@ const goalToPotentiality = curry((config: IConfig, query: IQuery): IPotentiality
 		children: [mask],
 		duration,
 		name: `${query.name}-goal-${i}`,
-		potentiel: -1,
+		pressure: -1,
 	}));
 });
 
-const atomicToDuration = ifHasStartEnd(converge(subtract, [qEnd, qStart]), qDuration);
+const atomicToDuration = ifHasStartEnd(
+	pipe(converge(subtract, [qEnd, qStart]), assoc('target', __, {})),
+	qDuration,
+);
 const atomicToChildren = (c: IConfig) =>
 	ifHasStartEnd(
 		applySpec<IRange>({ start: qStart, end: qEnd }),
@@ -257,5 +269,5 @@ const atomicToPotentiality = curry((config: IConfig, query: IQuery): IPotentiali
 	const duration = atomicToDuration(query);
 	const children = [atomicToChildren(config)(query)];
 	const name = `${query.name}-atomic`;
-	return [{ children, duration, name, potentiel: -1 }];
+	return [{ children, duration, name, pressure: -1 }];
 });

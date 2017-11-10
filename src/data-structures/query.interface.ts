@@ -2,7 +2,7 @@ import { GoalKind, QueryKind, RestrictionCondition } from './query.enum';
 
 export interface IGoal {
 	readonly kind: GoalKind;
-	readonly quantity: number;
+	readonly quantity: ITimeBoundary;
 	readonly time: number;
 }
 
