@@ -35,11 +35,10 @@ import { IConfig } from '../data-structures/config.interface';
 import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
+import { IPressurePoint } from '../data-structures/pressure-point.interface';
 import { GoalKind, RestrictionCondition } from '../data-structures/query.enum';
 import { IQuery, ITimeBoundary, ITimeRestriction } from '../data-structures/query.interface';
 import { IRange } from '../data-structures/range.interface';
-
-import { computePressureChunks } from './environment.flows';
 
 type maskFn = (tm: IRange) => IRange[];
 type mapRange = (r: IRange[], tm: IRange) => IRange[];
@@ -50,18 +49,43 @@ type toTimeBound = (o: any) => ITimeBoundary;
 
 export const queriesToPipeline = (config: IConfig, queries: IQuery[]): IMaterial[] => {
 	const potentials = queriesToPotentialities(config, queries);
-	return sortBy(prop('start'), unfold(pipelineUnfolder, potentials));
+	return sortBy(prop('start'), unfold(partial(pipelineUnfolder, [config]), potentials));
 };
 
-const pipelineUnfolder = (potentials: IPotentiality[]): false | [IMaterial, IPotentiality[]] => {
+const pipelineUnfolder = (
+	config: IConfig,
+	potentials: IPotentiality[],
+): false | [IMaterial, IPotentiality[]] => {
 	if (potentials.length < 1) {
 		return false;
 	}
 	const toPlace = reduce(maxBy<IPotentiality>(prop('pressure')), potentials[0], potentials);
 	const newPotentials = without([toPlace], potentials);
-	const material = materializePotentiality(computePressureChunks(toPlace, newPotentials));
+	const material = materializePotentiality(computePressureChunks(config, toPlace, newPotentials));
 	return [material, updatePotentialsPressure(material, newPotentials)];
 };
+
+const computePressureChunks = (
+	config: IConfig,
+	toPlace: IPotentiality,
+	potentialities: IPotentiality[],
+): IPressureChunk[] => {
+	const pressurePoints = potentialsToPressurePoint(potentialities);
+	return [];
+};
+
+const potentialsToPressurePoint = (potentialities: IPotentiality[]): any =>
+	unnest(
+		// Cannot use flatten til typing issue not resolved
+		potentialities.map(pot =>
+			unnest(
+				pot.places.map(pla => [
+					{ time: pla.start, pressureDiff: pot.pressure },
+					{ time: pla.end, pressureDiff: -pot.pressure },
+				]),
+			),
+		),
+	).sort((a, b) => a.time - b.time);
 
 const updatePotentialsPressure = (
 	material: IMaterial,
@@ -70,7 +94,7 @@ const updatePotentialsPressure = (
 	return [];
 };
 
-const materializePotentiality = (pressure: IPressureChunk): IMaterial => {
+const materializePotentiality = (pressure: IPressureChunk[]): IMaterial => {
 	return null;
 };
 
@@ -208,14 +232,14 @@ const maskRangeUnion = (ranges: IRange[], mask: IRange): IRange[] => {
 const updateChildren = (potentials: IPotentiality[], mask: IRange[]): IPotentiality[] => {
 	return potentials.map(
 		pipe(
-			p => ({ ...p, children: maskRangeUnion(mask, p.children[0]) }),
+			p => ({ ...p, children: maskRangeUnion(mask, p.places[0]) }),
 			p => ({ ...p, pressure: computePressure(p) }),
 		),
 	);
 };
 
 const computePressure = (p: IPotentiality): number => {
-	const space = sum(p.children.map(c => c.end - c.start));
+	const space = sum(p.places.map(c => c.end - c.start));
 	return (p.duration.min || 0 + (p.duration.target || 0)) / 2 * space;
 };
 
@@ -269,5 +293,5 @@ const atomicToPotentiality = curry((config: IConfig, query: IQuery): IPotentiali
 	const duration = atomicToDuration(query);
 	const children = [atomicToChildren(config)(query)];
 	const name = `${query.name}-atomic`;
-	return [{ children, duration, name, pressure: -1 }];
+	return [{ places, duration, name, pressure: -1 }];
 });
