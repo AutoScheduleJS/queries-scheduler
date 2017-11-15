@@ -20,6 +20,7 @@ import {
 	pipe,
 	prop,
 	reduce,
+	reduceBy,
 	reject,
 	sortBy,
 	subtract,
@@ -65,13 +66,12 @@ const pipelineUnfolder = (
 	}
 	const toPlace = reduce(maxBy<IPotentiality>(prop('pressure')), potentials[0], potentials);
 	const newPotentials = without([toPlace], potentials);
-	const material = materializePotentiality(computePressureChunks(config, toPlace, newPotentials));
+	const material = materializePotentiality(toPlace, computePressureChunks(config, newPotentials));
 	return [material, updatePotentialsPressure(material, newPotentials)];
 };
 
 const computePressureChunks = (
 	config: IConfig,
-	toPlace: IPotentiality,
 	potentialities: IPotentiality[],
 ): IPressureChunk[] => {
 	const pressurePoints = potentialsToPressurePoint(potentialities);
@@ -91,17 +91,27 @@ const pressureChunkUnfolder = (
 	return [{ ...chunk, end: pp.time }, [index + 1, { start: pp.time, pressure }]];
 };
 
-const potentialsToPressurePoint = (potentialities: IPotentiality[]): IPressurePoint[] =>
-	sortByTime(
-		flatten<any>(
-			potentialities.map(pot =>
-				pot.places.map(pla => [
-					{ time: pla.start, pressureDiff: pot.pressure },
-					{ time: pla.end, pressureDiff: -pot.pressure },
-				]),
-			),
+const potentialsToPressurePoint = (potentialities: IPotentiality[]): IPressurePoint[] => {
+	const rawPP = flatten<any>(
+		potentialities.map(pot =>
+			pot.places.map(pla => [
+				{ time: pla.start, pressureDiff: pot.pressure },
+				{ time: pla.end, pressureDiff: -pot.pressure },
+			]),
 		),
 	);
+	return sortByTime(Object.values(
+		reduceBy(
+			(acc: IPressurePoint, cur: IPressurePoint) => ({
+				pressureDiff: acc.pressureDiff + cur.pressureDiff,
+				time: cur.time,
+			}),
+			{ time: 0, pressureDiff: 0 },
+			pp => '' + pp.time,
+			rawPP,
+		),
+	) as IPressurePoint[]);
+};
 
 const updatePotentialsPressure = (
 	material: IMaterial,
@@ -110,7 +120,7 @@ const updatePotentialsPressure = (
 	return [];
 };
 
-const materializePotentiality = (pressure: IPressureChunk[]): IMaterial => {
+const materializePotentiality = (toPlace: IPotentiality, pressure: IPressureChunk[]): IMaterial => {
 	return null;
 };
 
