@@ -2,8 +2,13 @@ import { GoalKind, QueryKind, RestrictionCondition } from './query.enum';
 
 export interface IGoal {
 	readonly kind: GoalKind;
-	readonly quantity: ITimeBoundary;
+	readonly quantity: ITimeDuration;
 	readonly time: number;
+}
+
+export interface ITimeDuration {
+	readonly min: number;
+	readonly target: number;
 }
 
 export interface ITimeBoundary {
@@ -27,7 +32,7 @@ export interface IQuery {
 	readonly id: number;
 	readonly name: string;
 	readonly kind: QueryKind;
-	readonly duration?: ITimeBoundary;
+	readonly duration?: ITimeDuration;
 	readonly start?: ITimeBoundary;
 	readonly end?: ITimeBoundary;
 	readonly goal?: IGoal;

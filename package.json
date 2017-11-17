@@ -32,12 +32,7 @@
     "url": "https://github.com/AutoScheduleJS/queries-scheduler/issues"
   },
   "homepage": "https://github.com/AutoScheduleJS/queries-scheduler#readme",
-  "dependencies": {
-    "moment": "^2.19.2",
-    "moment-range": "^3.0.3",
-    "ramda": "^0.25.0",
-    "rxjs": "^5.5.2"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@semantic-release/release-notes-generator": "^5.0.1",
     "@types/moment-range": "^3.0.4",
@@ -45,8 +40,12 @@
     "ava": "^0.23.0",
     "concurrently": "^3.5.0",
     "cz-conventional-changelog": "^2.1.0",
+    "moment": "^2.19.2",
+    "moment-range": "^3.0.3",
     "nyc": "^11.3.0",
     "prettier": "^1.8.2",
+    "ramda": "^0.25.0",
+    "rxjs": "^5.5.2",
     "semantic-release": "^8.2.0",
     "ts-loader": "^3.1.1",
     "tslint": "^5.8.0",
