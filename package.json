@@ -33,7 +33,7 @@
   },
   "homepage": "https://github.com/AutoScheduleJS/queries-scheduler#readme",
   "devDependencies": {
-    "@semantic-release/release-notes-generator": "^5.0.1",
+    "@semantic-release/release-notes-generator": "^6.0.0",
     "ava": "^0.23.0",
     "concurrently": "^3.5.0",
     "cz-conventional-changelog": "^2.0.0",
