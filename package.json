@@ -40,7 +40,7 @@
     "ava": "^0.23.0",
     "concurrently": "^3.5.1",
     "cz-conventional-changelog": "^2.1.0",
-    "intervals-fn": "^2.4.1",
+    "intervals-fn": "^2.5.1",
     "moment": "^2.19.2",
     "moment-range": "^3.0.3",
     "nyc": "^11.3.0",
