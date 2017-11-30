@@ -1,5 +1,4 @@
-import { complement, intersect, isDuring, isOverlapping, substract } from 'intervals-fn';
-import * as moment from 'moment';
+import { intersect, isDuring, isOverlapping, substract } from 'intervals-fn';
 import * as R from 'ramda';
 
 import { IConfig } from '../data-structures/config.interface';
@@ -7,47 +6,18 @@ import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality, IPotentialitySimul } from '../data-structures/potentiality.interface';
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
 import { IPressureChunkPoint, IPressurePoint } from '../data-structures/pressure-point.interface';
-import { GoalKind, RestrictionCondition } from '../data-structures/query.enum';
-import { IQuery, ITimeDuration, ITimeRestriction } from '../data-structures/query.interface';
+import { ITimeDuration } from '../data-structures/query.interface';
 import { IRange } from '../data-structures/range.interface';
 
-type maskFn = (tm: IRange) => IRange[];
-type mapRange = (r: IRange[], tm: IRange) => IRange[];
-type toNumber = (o: any) => number;
-type getFirstFn = (rest: IRange) => IRange;
-type unfoldRange = (seed: IRange) => false | [IRange, IRange];
-type toTimeDur = (o: any) => ITimeDuration;
-
-export const queriesToPipeline = (config: IConfig, queries: IQuery[]): IMaterial[] => {
-	const potentials = queriesToPotentialities(config, queries);
-	return sortByStart(
-		R.unnest(R.unfold(R.partial(pipelineUnfolder, [config]), potentials)),
-	) as IMaterial[];
+export const computePressure = (p: IPotentiality): number => {
+	const space = R.sum(p.places.map(c => c.end - c.start));
+	return (p.duration.min || 0 + (p.duration.target || 0)) / 2 * space;
 };
 
 const sortByTime = R.sortBy<IPressurePoint>(R.prop('time'));
-const sortByStart = R.sortBy<IMaterial | IRange>(R.prop('start'));
 const sortByPressure = R.sortBy<IPressureChunk>(R.prop('pressure'));
-const getMax = <T>(prop: keyof T, list: T[]): T =>
-	R.reduce(R.maxBy(R.prop(prop) as (n: any) => number), list[0], list);
 
-const pipelineUnfolder = (
-	config: IConfig,
-	potentials: IPotentiality[],
-): false | [IMaterial[], IPotentiality[]] => {
-	if (potentials.length < 1) {
-		return false;
-	}
-	const toPlace = getMax('pressure', potentials);
-	const newPotentials = R.without([toPlace], potentials);
-	return materializePotentiality(
-		toPlace,
-		R.partial(updatePotentialsPressure, [newPotentials]),
-		computePressureChunks(config, newPotentials),
-	);
-};
-
-const computePressureChunks = (
+export const computePressureChunks = (
 	config: IConfig,
 	potentialities: IPotentiality[],
 ): IPressureChunk[] => {
@@ -90,7 +60,7 @@ const potentialsToPressurePoint = (potentialities: IPotentiality[]): IPressurePo
 	) as IPressurePoint[]);
 };
 
-const updatePotentialsPressure = (
+export const updatePotentialsPressure = (
 	potentialities: IPotentiality[],
 	materials: IMaterial[],
 ): IPotentiality[] => {
@@ -102,7 +72,7 @@ const updatePotentialsPressure = (
 	);
 };
 
-const materializePotentiality = (
+export const materializePotentiality = (
 	toPlace: IPotentiality,
 	updatePP: (m: IMaterial[]) => IPotentiality[],
 	pressure: IPressureChunk[],
@@ -207,15 +177,6 @@ const placeSplittable = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]
 	return result;
 };
 
-/*
- * place potential according to pressureChunk.
- * select least pressured place.
- * place can be on multiple chunks.
- * contiguous condition with isSplittable.
- * use a data-structure/container duration oriented.
- * duration & contiguous -> start & end
- * duration & splittable -> chunks ordered by pressure & prefer contiguous when same pressure.
- */
 const simulatePlacement = (
 	toPlace: IPotentialitySimul,
 	pressure: IPressureChunk[],
@@ -224,20 +185,6 @@ const simulatePlacement = (
 		return placeAtomic(toPlace, pressure);
 	}
 	return placeSplittable(toPlace, pressure);
-
-	// if (!toPlace.isSplittable) {
-	// 	const bestChunk = getMin(
-	// 		'pressure',
-	// 		pressure.filter(
-	// 			R.and(isOverlapping(toPlace.places), (p: IRange) => p.end - p.start > toPlace.duration),
-	// 		),
-	// 	);
-	// 	return {
-	// 		end: bestChunk.start + toPlace.duration,
-	// 		id: Date.now(),
-	// 		start: bestChunk.start,
-	// 	};
-	// }
 };
 
 const validatePotentials = R.none(R.propEq('pressure', -1));
@@ -261,183 +208,4 @@ const potToSimul = (durationType: keyof ITimeDuration, pot: IPotentiality): IPot
 	duration: pot.duration[durationType],
 	isSplittable: pot.isSplittable,
 	places: pot.places,
-});
-
-const queriesToPotentialities = (config: IConfig, queries: IQuery[]): IPotentiality[] => {
-	return R.unnest(
-		queries.map(
-			R.converge(updateChildren, [
-				R.ifElse(R.has('goal'), goalToPotentiality(config), atomicToPotentiality(config)),
-				queryToMask(config),
-			]),
-		),
-	);
-};
-
-const queryToMask = R.curry((config: IConfig, query: IQuery): IRange[] => {
-	const timeRestrictions = query.timeRestrictions || {};
-	const maskPipeline = R.pipe(
-		mapToTimeRestriction(timeRestrictions.month, mapToMonthRange),
-		mapToTimeRestriction(timeRestrictions.weekday, mapToWeekdayRange),
-		mapToTimeRestriction(timeRestrictions.hour, mapToHourRange),
-	);
-	return maskPipeline([{ start: config.startDate, end: config.endDate }]);
-});
-
-const mapToTimeRestriction = R.curry(
-	(tr: ITimeRestriction | undefined, mapFn: mapRange, masks: IRange[]): IRange[] => {
-		return tr == null ? masks : R.unnest(masks.map(getMaskFilterFn(tr, mapFn)));
-	},
-);
-
-const mapToMonthRange = (restricts: IRange[], mask: IRange): IRange[] => {
-	const end = +moment(mask.end).endOf('day');
-	return restrictsToRanges(getFirstMonthRange(mask), rangesUnfolder(end, 'year'), restricts);
-};
-
-const getFirstMonthRange = R.curry((mask: IRange, restrict: IRange): IRange => {
-	const startOfYear = +moment(mask.start).startOf('year');
-	const start = +addDecimalMonthTo(startOfYear, restrict.start);
-	const end = +addDecimalMonthTo(startOfYear, restrict.end);
-	return { start, end };
-});
-
-const mapToWeekdayRange = (restricts: IRange[], mask: IRange): IRange[] => {
-	const end = +moment(mask.end).endOf('day');
-	return restrictsToRanges(getFirstWeekdayRange(mask), rangesUnfolder(end, 'week'), restricts);
-};
-
-const getFirstWeekdayRange = R.curry((mask: IRange, restrict: IRange): IRange => {
-	const startOfWeek = +moment(mask.start).startOf('week');
-	const start = +addDecimalDayTo(startOfWeek, restrict.start);
-	const end = +addDecimalDayTo(startOfWeek, restrict.end);
-	return { start, end };
-});
-
-const mapToHourRange = (restricts: IRange[], mask: IRange): IRange[] => {
-	const end = +moment(mask.end).endOf('day');
-	return restrictsToRanges(getFirstHourRange(mask), rangesUnfolder(end, 'day'), restricts);
-};
-
-const restrictsToRanges = (getFirst: getFirstFn, unfoldFn: unfoldRange, restricts: IRange[]) => {
-	return R.unnest(restricts.map(R.pipe(getFirst, R.unfold(unfoldFn))));
-};
-
-const addDecimalDayTo = (date: number, days: number) =>
-	moment(date)
-		.add(Math.floor(days), 'day')
-		.add((days % 1) * 24, 'hour');
-const addDecimalMonthTo = (date: number, month: number) => {
-	const mDate = moment(date).add(Math.floor(month), 'month');
-	return mDate.add((month % 1) * mDate.daysInMonth(), 'day');
-};
-const addToTimestamp = (
-	nb: moment.DurationInputArg1,
-	kind: moment.unitOfTime.DurationConstructor,
-) => (ts: number) => +moment(ts).add(nb, kind);
-
-const rangesUnfolder = (end: number, kind: moment.unitOfTime.DurationConstructor) => (
-	range: IRange,
-): false | [IRange, IRange] => {
-	const nextRange = R.map(addToTimestamp(1, kind), range);
-	if (range.start >= end) {
-		return false;
-	}
-	return [nextRange, nextRange];
-};
-
-const getFirstHourRange = R.curry((mask: IRange, restrict: IRange): IRange => {
-	const start = +moment(mask.start)
-		.startOf('day')
-		.add(restrict.start, 'hour');
-	const end = +moment(mask.start)
-		.startOf('day')
-		.add(restrict.end, 'hour');
-	return { start, end };
-});
-
-const getMaskFilterFn = (tr: ITimeRestriction, mapFn: mapRange): maskFn => {
-	return R.converge(
-		(ranges: IRange[], mask: IRange) =>
-			tr.condition === RestrictionCondition.InRange ? ranges : complement(mask, ranges),
-		[
-			R.converge(intersect, [
-				R.partial(mapFn, tr.ranges.map(r => ({ start: r[0], end: r[1] }))),
-				R.identity,
-			]),
-			R.identity,
-		],
-	);
-};
-
-const updateChildren = (potentials: IPotentiality[], mask: IRange[]): IPotentiality[] => {
-	return potentials.map(
-		R.pipe(
-			(p: IPotentiality) => ({ ...p, children: intersect(mask, p.places[0]) }),
-			(p: IPotentiality) => ({ ...p, pressure: computePressure(p) }),
-		),
-	);
-};
-
-const computePressure = (p: IPotentiality): number => {
-	const space = R.sum(p.places.map(c => c.end - c.start));
-	return (p.duration.min || 0 + (p.duration.target || 0)) / 2 * space;
-};
-
-const ifHasStartEnd = R.ifElse(R.and(R.has('start'), R.has('end')));
-const queryIsSplittable = (query: IQuery) =>
-	query.goal ? query.goal.kind === GoalKind.Splittable : false;
-const getTarget: (s: string) => toNumber = kind => R.pathOr(0, [kind, 'target']);
-const qStart: toNumber = getTarget('start');
-const qEnd: toNumber = getTarget('end');
-const qDuration: toTimeDur = R.pathOr({ min: 0, target: 0 }, ['duration']);
-const gQuantity: toTimeDur = R.pathOr({ min: 0, target: 0 }, ['goal', 'quantity']);
-const gQuantityTarget: toNumber = R.pipe(gQuantity, R.pathOr(1, ['target']) as toNumber);
-const gtime: toNumber = R.pathOr(0, ['goal', 'time']);
-
-const goalToDuration = R.ifElse(queryIsSplittable, gQuantity, qDuration);
-const goalToTimeloop = R.ifElse(
-	queryIsSplittable,
-	gtime,
-	R.converge(R.divide, [gtime, gQuantityTarget]),
-);
-
-const goalToSubpipes = (config: IConfig, query: IQuery): IRange[] => {
-	const start = config.startDate;
-	const timeloop = goalToTimeloop(query);
-	const maxDuration = config.endDate - config.startDate;
-	const subpipeCount = Math.floor(maxDuration / timeloop);
-	return R.times(
-		i => ({ start: start + timeloop * i, end: start - 1 + timeloop * (i + 1) }),
-		subpipeCount,
-	);
-};
-
-const goalToPotentiality = R.curry((config: IConfig, query: IQuery): IPotentiality[] => {
-	const duration = goalToDuration(query);
-	const subpipes = goalToSubpipes(config, query);
-	return subpipes.map((mask, i) => ({
-		duration,
-		isSplittable: queryIsSplittable(query),
-		name: `${query.name}-goal-${i}`,
-		places: [mask],
-		pressure: -1,
-	}));
-});
-
-const atomicToDuration = ifHasStartEnd(
-	R.pipe(R.converge(R.subtract, [qEnd, qStart]), R.assoc('target', R.__, {})),
-	qDuration,
-);
-const atomicToChildren = (c: IConfig) =>
-	ifHasStartEnd(
-		R.applySpec<IRange>({ start: qStart, end: qEnd }),
-		R.always<IRange>({ start: c.startDate, end: c.endDate }),
-	);
-
-const atomicToPotentiality = R.curry((config: IConfig, query: IQuery): IPotentiality[] => {
-	const duration = atomicToDuration(query) as ITimeDuration;
-	const places = [atomicToChildren(config)(query)];
-	const name = `${query.name}-atomic`;
-	return [{ isSplittable: queryIsSplittable(query), places, duration, name, pressure: -1 }];
 });

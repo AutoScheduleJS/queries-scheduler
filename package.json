@@ -5,13 +5,13 @@
   "main": "index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "ava": "ava build/.*.test.js",
+    "ava": "ava build/**/*.test.js",
     "test": "tslint -p ./ && tsc && nyc npm run ava",
     "build": "webpack",
     "prepublish": "npm run build",
     "semantic-release": "semantic-release pre && npm publish && semantic-release post",
     "watch:ts": "tsc -w",
-    "watch:ava": "ava -w build/.*.test.js",
+    "watch:ava": "ava -w build/**/*.test.js",
     "watch:test": "concurrently -k -p \"[{name}]\" -n \"TypeScript,Ava\" -c \"blue.bold,magenta.bold\" \"npm run watch:ts\" \"npm run watch:ava\""
   },
   "repository": {
