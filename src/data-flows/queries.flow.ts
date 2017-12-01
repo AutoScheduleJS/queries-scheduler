@@ -60,10 +60,12 @@ const addDecimalDayTo = (date: number, days: number) =>
 	moment(date)
 		.add(Math.floor(days), 'day')
 		.add((days % 1) * 24, 'hour');
+
 const addDecimalMonthTo = (date: number, month: number) => {
 	const mDate = moment(date).add(Math.floor(month), 'month');
 	return mDate.add((month % 1) * mDate.daysInMonth(), 'day');
 };
+
 const addToTimestamp = (
 	nb: moment.DurationInputArg1,
 	kind: moment.unitOfTime.DurationConstructor,

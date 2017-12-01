@@ -2,7 +2,6 @@ const webpack = require('webpack');
 const path = require('path');
 const nodeEnv = process.env.NODE_ENV || 'development';
 const isProd = nodeEnv === 'production';
-const rxPaths = require('rxjs/_esm5/path-mapping');
 
 const config = {
 	entry: './src/index.ts',
@@ -12,7 +11,6 @@ const config = {
 	},
 	resolve: {
 		extensions: ['.js', '.ts', '.json'],
-		alias: rxPaths(),
 	},
 	devtool: isProd ? 'hidden-source-map' : 'cheap-module-eval-source-map',
 	plugins: [
