@@ -1,14 +1,14 @@
 export enum QueryKind {
   Placeholder,
-  Atomic
+  Atomic,
 }
 
 export enum GoalKind {
   Atomic,
-  Splittable
+  Splittable,
 }
 
 export enum RestrictionCondition {
   InRange,
-  OutRange
+  OutRange,
 }
