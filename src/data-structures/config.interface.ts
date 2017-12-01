@@ -1,4 +1,4 @@
 export interface IConfig {
-	readonly startDate: number;
-	readonly endDate: number;
+  readonly startDate: number;
+  readonly endDate: number;
 }

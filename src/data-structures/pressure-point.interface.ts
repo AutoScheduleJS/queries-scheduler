@@ -1,9 +1,9 @@
 export interface IPressurePoint {
-	time: number;
-	pressureDiff: number;
+  time: number;
+  pressureDiff: number;
 }
 
 export interface IPressureChunkPoint {
-	start: number;
-	pressure: number;
+  start: number;
+  pressure: number;
 }

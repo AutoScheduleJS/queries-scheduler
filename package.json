@@ -5,7 +5,7 @@
   "main": "dist/index.bundle.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "ava": "ava build/**/*.test.js",
+    "ava": "ava **/*.test.js",
     "test": "tslint -p ./ && tsc && nyc --reporter=lcov npm run ava",
     "test:codecov": "tslint -p ./ && tsc && nyc npm run ava",
     "build": "webpack",
