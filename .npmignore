@@ -1,10 +1,14 @@
-src
+lib
 tsconfig.json
 tslint.json
-.travis.yml
-.prettierrc.json
+typedoc.js
+*.yml
+*.sh
+webpack.config.js
+.prettierrc
 docs
 coverage
+cc-test-reporter
 .nyc_output
 build
 dist/build
