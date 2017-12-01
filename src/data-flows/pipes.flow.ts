@@ -10,202 +10,202 @@ import { ITimeDuration } from '../data-structures/query.interface';
 import { IRange } from '../data-structures/range.interface';
 
 export const computePressure = (p: IPotentiality): number => {
-	const space = R.sum(p.places.map(c => c.end - c.start));
-	return (p.duration.min || 0 + (p.duration.target || 0)) / 2 * space;
+  const space = R.sum(p.places.map(c => c.end - c.start));
+  return (p.duration.min || 0 + (p.duration.target || 0)) / 2 * space;
 };
 
 const sortByTime = R.sortBy<IPressurePoint>(R.prop('time'));
 const sortByPressure = R.sortBy<IPressureChunk>(R.prop('pressure'));
 
 export const computePressureChunks = (
-	config: IConfig,
-	potentialities: IPotentiality[],
+  config: IConfig,
+  potentialities: IPotentiality[]
 ): IPressureChunk[] => {
-	const pressurePoints = potentialsToPressurePoint(potentialities);
-	const initChunk: IPressureChunk = { start: config.startDate, end: config.endDate, pressure: 0 };
-	return R.unfold(R.partial(pressureChunkUnfolder, [pressurePoints]), [0, initChunk]);
+  const pressurePoints = potentialsToPressurePoint(potentialities);
+  const initChunk: IPressureChunk = { start: config.startDate, end: config.endDate, pressure: 0 };
+  return R.unfold(R.partial(pressureChunkUnfolder, [pressurePoints]), [0, initChunk]);
 };
 
 const pressureChunkUnfolder = (
-	pressurePoints: IPressurePoint[],
-	[index, chunk]: [number, IPressureChunkPoint],
+  pressurePoints: IPressurePoint[],
+  [index, chunk]: [number, IPressureChunkPoint]
 ): false | [IPressureChunk, [number, IPressureChunkPoint]] => {
-	if (index >= pressurePoints.length) {
-		return false;
-	}
-	const pp = pressurePoints[index];
-	const pressure = chunk.pressure + pp.pressureDiff;
-	return [{ ...chunk, end: pp.time }, [index + 1, { start: pp.time, pressure }]];
+  if (index >= pressurePoints.length) {
+    return false;
+  }
+  const pp = pressurePoints[index];
+  const pressure = chunk.pressure + pp.pressureDiff;
+  return [{ ...chunk, end: pp.time }, [index + 1, { start: pp.time, pressure }]];
 };
 
 const potentialsToPressurePoint = (potentialities: IPotentiality[]): IPressurePoint[] => {
-	const rawPP = R.flatten<any>(
-		potentialities.map(pot =>
-			pot.places.map(pla => [
-				{ time: pla.start, pressureDiff: pot.pressure },
-				{ time: pla.end, pressureDiff: -pot.pressure },
-			]),
-		),
-	);
-	return sortByTime(Object.values(
-		R.reduceBy(
-			(acc: IPressurePoint, cur: IPressurePoint) => ({
-				pressureDiff: acc.pressureDiff + cur.pressureDiff,
-				time: cur.time,
-			}),
-			{ time: 0, pressureDiff: 0 },
-			pp => '' + pp.time,
-			rawPP,
-		),
-	) as IPressurePoint[]);
+  const rawPP = R.flatten<any>(
+    potentialities.map(pot =>
+      pot.places.map(pla => [
+        { time: pla.start, pressureDiff: pot.pressure },
+        { time: pla.end, pressureDiff: -pot.pressure },
+      ])
+    )
+  );
+  return sortByTime(Object.values(
+    R.reduceBy(
+      (acc: IPressurePoint, cur: IPressurePoint) => ({
+        pressureDiff: acc.pressureDiff + cur.pressureDiff,
+        time: cur.time,
+      }),
+      { time: 0, pressureDiff: 0 },
+      pp => '' + pp.time,
+      rawPP
+    )
+  ) as IPressurePoint[]);
 };
 
 export const updatePotentialsPressure = (
-	potentialities: IPotentiality[],
-	materials: IMaterial[],
+  potentialities: IPotentiality[],
+  materials: IMaterial[]
 ): IPotentiality[] => {
-	return potentialities.map(
-		R.pipe(
-			(p: IPotentiality) => ({ ...p, places: substract(p.places, materials) }),
-			(p: IPotentiality) => ({ ...p, pressure: computePressure(p) }),
-		),
-	);
+  return potentialities.map(
+    R.pipe(
+      (p: IPotentiality) => ({ ...p, places: substract(p.places, materials) }),
+      (p: IPotentiality) => ({ ...p, pressure: computePressure(p) })
+    )
+  );
 };
 
 export const materializePotentiality = (
-	toPlace: IPotentiality,
-	updatePP: (m: IMaterial[]) => IPotentiality[],
-	pressure: IPressureChunk[],
+  toPlace: IPotentiality,
+  updatePP: (m: IMaterial[]) => IPotentiality[],
+  pressure: IPressureChunk[]
 ): [IMaterial[], IPotentiality[]] => {
-	const minMaterial = simulatePlacement(potToSimul('min', toPlace), pressure);
-	const maxMaterial = simulatePlacement(potToSimul('target', toPlace), pressure);
-	const minPots = updatePP(minMaterial);
-	const maxPots = updatePP(maxMaterial);
-	const minAvg = potentialsToMeanPressure(minPots);
-	const maxAvg = potentialsToMeanPressure(maxPots);
-	if (minAvg === maxAvg) {
-		return [maxMaterial, maxPots];
-	}
-	const durationDiff = toPlace.duration.target - toPlace.duration.min;
-	const idealDuration =
-		toPlace.duration.min + getIntersectionPressure(durationDiff, [minAvg, maxAvg]);
-	const material = simulatePlacement(
-		{ isSplittable: toPlace.isSplittable, places: toPlace.places, duration: idealDuration },
-		pressure,
-	);
-	const updatedPotentials = updatePP(material);
-	throwIfInvalid(validatePotentials)(updatedPotentials);
-	return [material, updatedPotentials];
+  const minMaterial = simulatePlacement(potToSimul('min', toPlace), pressure);
+  const maxMaterial = simulatePlacement(potToSimul('target', toPlace), pressure);
+  const minPots = updatePP(minMaterial);
+  const maxPots = updatePP(maxMaterial);
+  const minAvg = potentialsToMeanPressure(minPots);
+  const maxAvg = potentialsToMeanPressure(maxPots);
+  if (minAvg === maxAvg) {
+    return [maxMaterial, maxPots];
+  }
+  const durationDiff = toPlace.duration.target - toPlace.duration.min;
+  const idealDuration =
+    toPlace.duration.min + getIntersectionPressure(durationDiff, [minAvg, maxAvg]);
+  const material = simulatePlacement(
+    { isSplittable: toPlace.isSplittable, places: toPlace.places, duration: idealDuration },
+    pressure
+  );
+  const updatedPotentials = updatePP(material);
+  throwIfInvalid(validatePotentials)(updatedPotentials);
+  return [material, updatedPotentials];
 };
 
 const getProportionalPressure = (
-	dur1: number,
-	press1: number,
-	dur2: number,
-	press2: number,
+  dur1: number,
+  press1: number,
+  dur2: number,
+  press2: number
 ): number => {
-	const total = dur1 + dur2;
-	const newPress1 = press1 * dur1 / total;
-	const newPress2 = press2 * dur2 / total;
-	return (newPress1 + newPress2) / 2;
+  const total = dur1 + dur2;
+  const newPress1 = press1 * dur1 / total;
+  const newPress2 = press2 * dur2 / total;
+  return (newPress1 + newPress2) / 2;
 };
 
 const computeContiguousPressureChunk = (
-	duration: number,
-	chunks: IPressureChunk[],
+  duration: number,
+  chunks: IPressureChunk[]
 ): IPressureChunk[] => {
-	const firstTime = chunks[0].start;
-	const lastTime = chunks[chunks.length - 1].end;
-	return R.unnest(
-		chunks.map(c => [
-			{ start: c.start, end: c.start + duration },
-			{ end: c.end, start: c.end - duration },
-		]),
-	)
-		.filter(c => c.start >= firstTime && c.end <= lastTime)
-		.map(c => {
-			// [start, end] & chunks[] --> chunks cut to start end, conserving their data
-			return intersect(c, chunks).reduce((acc, curr) => ({
-				...acc,
-				pressure: getProportionalPressure(
-					acc.end - acc.start,
-					acc.pressure,
-					curr.end - curr.start,
-					curr.pressure,
-				),
-			}));
-		});
+  const firstTime = chunks[0].start;
+  const lastTime = chunks[chunks.length - 1].end;
+  return R.unnest(
+    chunks.map(c => [
+      { start: c.start, end: c.start + duration },
+      { end: c.end, start: c.end - duration },
+    ])
+  )
+    .filter(c => c.start >= firstTime && c.end <= lastTime)
+    .map(c => {
+      // [start, end] & chunks[] --> chunks cut to start end, conserving their data
+      return intersect(c, chunks).reduce((acc, curr) => ({
+        ...acc,
+        pressure: getProportionalPressure(
+          acc.end - acc.start,
+          acc.pressure,
+          curr.end - curr.start,
+          curr.pressure
+        ),
+      }));
+    });
 };
 
 const placeAtomic = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]): IMaterial[] => {
-	const sortedChunks = sortByPressure(computeContiguousPressureChunk(toPlace.duration, pressure));
-	if (sortedChunks.length === 0) {
-		throw new Error('No chunks available');
-	}
-	const bestChunk = sortedChunks.find((chunk: IPressureChunk) => {
-		return toPlace.places.some(isDuring<IRange>(chunk));
-	});
-	if (!bestChunk) {
-		throw new Error('No chunks available');
-	}
-	return [
-		{
-			end: bestChunk.end,
-			id: Date.now(),
-			start: bestChunk.start,
-		},
-	];
+  const sortedChunks = sortByPressure(computeContiguousPressureChunk(toPlace.duration, pressure));
+  if (sortedChunks.length === 0) {
+    throw new Error('No chunks available');
+  }
+  const bestChunk = sortedChunks.find((chunk: IPressureChunk) => {
+    return toPlace.places.some(isDuring<IRange>(chunk));
+  });
+  if (!bestChunk) {
+    throw new Error('No chunks available');
+  }
+  return [
+    {
+      end: bestChunk.end,
+      id: Date.now(),
+      start: bestChunk.start,
+    },
+  ];
 };
 
 const placeSplittable = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]): IMaterial[] => {
-	const sortedChunks = sortByPressure(pressure.filter(isOverlapping(toPlace.places)));
-	let materializedSpace = 0;
-	const result: IMaterial[] = [];
-	while (materializedSpace < toPlace.duration && sortedChunks.length > 0) {
-		const best = sortedChunks.pop() as IPressureChunk;
-		const bestDur = best.end - best.start;
-		if (bestDur > toPlace.duration) {
-			best.end = best.start + toPlace.duration;
-		}
-		materializedSpace += bestDur;
-		result.push({
-			end: best.end,
-			id: Date.now(),
-			start: best.start,
-		});
-	}
-	return result;
+  const sortedChunks = sortByPressure(pressure.filter(isOverlapping(toPlace.places)));
+  let materializedSpace = 0;
+  const result: IMaterial[] = [];
+  while (materializedSpace < toPlace.duration && sortedChunks.length > 0) {
+    const best = sortedChunks.pop() as IPressureChunk;
+    const bestDur = best.end - best.start;
+    if (bestDur > toPlace.duration) {
+      best.end = best.start + toPlace.duration;
+    }
+    materializedSpace += bestDur;
+    result.push({
+      end: best.end,
+      id: Date.now(),
+      start: best.start,
+    });
+  }
+  return result;
 };
 
 const simulatePlacement = (
-	toPlace: IPotentialitySimul,
-	pressure: IPressureChunk[],
+  toPlace: IPotentialitySimul,
+  pressure: IPressureChunk[]
 ): IMaterial[] => {
-	if (!toPlace.isSplittable) {
-		return placeAtomic(toPlace, pressure);
-	}
-	return placeSplittable(toPlace, pressure);
+  if (!toPlace.isSplittable) {
+    return placeAtomic(toPlace, pressure);
+  }
+  return placeSplittable(toPlace, pressure);
 };
 
 const validatePotentials = R.none(R.propEq('pressure', -1));
 const throwIfInvalid = (validator: (d: any) => boolean) =>
-	R.unless(validator, d => {
-		throw new Error(`Invalid ${d}`);
-	});
+  R.unless(validator, d => {
+    throw new Error(`Invalid ${d}`);
+  });
 
 const getIntersectionPressure = (durDiff: number, [minAvg, maxAvg]: [number, number]): number => {
-	const avgSeg = minAvg - maxAvg;
-	return -minAvg * durDiff ** 2 / (-durDiff * (avgSeg + 1));
+  const avgSeg = minAvg - maxAvg;
+  return -minAvg * durDiff ** 2 / (-durDiff * (avgSeg + 1));
 };
 
 const potentialsToMeanPressure = R.pipe(
-	(pots: IPotentiality[]) =>
-		pots.map(R.pipe(R.pathOr(0, ['pressure']) as (n: IPotentiality) => number, R.max(1))), // Workaround for npm-ramda issue #311
-	R.mean,
+  (pots: IPotentiality[]) =>
+    pots.map(R.pipe(R.pathOr(0, ['pressure']) as (n: IPotentiality) => number, R.max(1))), // Workaround for npm-ramda issue #311
+  R.mean
 );
 
 const potToSimul = (durationType: keyof ITimeDuration, pot: IPotentiality): IPotentialitySimul => ({
-	duration: pot.duration[durationType],
-	isSplittable: pot.isSplittable,
-	places: pot.places,
+  duration: pot.duration[durationType],
+  isSplittable: pot.isSplittable,
+  places: pot.places,
 });
