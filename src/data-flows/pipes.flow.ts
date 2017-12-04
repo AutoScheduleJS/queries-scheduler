@@ -11,7 +11,7 @@ import { IRange } from '../data-structures/range.interface';
 
 export const computePressure = (p: IPotentiality): number => {
   const space = R.sum(p.places.map(c => c.end - c.start));
-  return (p.duration.min || 0 + (p.duration.target || 0)) / 2 * space;
+  return (p.duration.min + p.duration.target) / space / 2;
 };
 
 const sortByTime = R.sortBy<IPressurePoint>(R.prop('time'));
