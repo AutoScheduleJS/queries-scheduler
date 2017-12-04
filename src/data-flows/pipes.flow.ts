@@ -87,25 +87,25 @@ export const materializePotentiality = (
   updatePP: (m: IMaterial[]) => IPotentiality[],
   pressure: IPressureChunk[]
 ): [IMaterial[], IPotentiality[]] => {
-  const minMaterial = simulatePlacement(potToSimul('min', toPlace), pressure);
-  const maxMaterial = simulatePlacement(potToSimul('target', toPlace), pressure);
-  const minPots = updatePP(minMaterial);
-  const maxPots = updatePP(maxMaterial);
+  const minMaterials = simulatePlacement(potToSimul('min', toPlace), pressure);
+  const maxMaterials = simulatePlacement(potToSimul('target', toPlace), pressure);
+  const minPots = updatePP(minMaterials);
+  const maxPots = updatePP(maxMaterials);
   const minAvg = potentialsToMeanPressure(minPots);
   const maxAvg = potentialsToMeanPressure(maxPots);
   if (minAvg === maxAvg) {
-    return [maxMaterial, maxPots];
+    return [maxMaterials, maxPots];
   }
   const durationDiff = toPlace.duration.target - toPlace.duration.min;
   const idealDuration =
     toPlace.duration.min + getIntersectionPressure(durationDiff, [minAvg, maxAvg]);
-  const material = simulatePlacement(
+  const materials = simulatePlacement(
     { isSplittable: toPlace.isSplittable, places: toPlace.places, duration: idealDuration },
     pressure
   );
-  const updatedPotentials = updatePP(material);
+  const updatedPotentials = updatePP(materials);
   throwIfInvalid(validatePotentials)(updatedPotentials);
-  return [material, updatedPotentials];
+  return [materials, updatedPotentials];
 };
 
 const getProportionalPressure = (
@@ -197,7 +197,7 @@ const simulatePlacement = (
   return placeSplittable(toPlace, pressure);
 };
 
-const validatePotentials = R.none(R.propEq('pressure', -1));
+const validatePotentials = R.none(R.propSatisfies(p => p > 1, 'pressure'));
 const throwIfInvalid = (validator: (d: any) => boolean) =>
   R.unless(validator, d => {
     throw new Error(`Invalid ${d}`);

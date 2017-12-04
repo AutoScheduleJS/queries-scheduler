@@ -9,8 +9,8 @@ import { IRange } from '../data-structures/range.interface';
 import {
   computePressure,
   computePressureChunks,
-  // materializePotentiality,
-  // updatePotentialsPressure,
+  materializePotentiality,
+  updatePotentialsPressure,
 } from './pipes.flow';
 
 const potentialFactory = (
@@ -74,4 +74,28 @@ test('will simplify pressure chunks', t => {
   ]);
   t.true(pChunkB.length === 1);
   t.true(isEqual({ start: 0, end: 10 }, pChunkB[0]) && pChunkB[0].pressure === 0.75);
+});
+
+test('will materialize potentiality', t => {
+  const toPlace = potentialFactory({ min: 1, target: 1 }, [{ end: 10, start: 0 }], 0.1);
+  const pots = [
+    potentialFactory({ min: 5, target: 5 }, [{ end: 5, start: 0 }], 1),
+    potentialFactory({ min: 4, target: 4 }, [{ end: 10, start: 6 }], 1),
+  ];
+  const pChunks = computePressureChunks({ startDate: 0, endDate: 0 }, pots);
+  const materials = materializePotentiality(toPlace, () => pots, pChunks)[0];
+  t.true(materials.length === 1);
+  t.true(materials[0].start === 5 && materials[0].end === 6);
+});
+
+test('materialize will throw if not placable', t => {
+  const toPlace = potentialFactory({ min: 5, target: 10 }, [{ end: 10, start: 0 }], 0.6);
+  const pots = [
+    potentialFactory({ min: 5, target: 5 }, [{ end: 5, start: 0 }], 0.5),
+    potentialFactory({ min: 4, target: 4 }, [{ end: 10, start: 6 }], 0.65),
+  ];
+  const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, pots);
+  t.throws(
+    materializePotentiality.bind(null, toPlace, updatePotentialsPressure.bind(null, pots), pChunks)
+  );
 });
