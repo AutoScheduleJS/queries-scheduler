@@ -7,6 +7,7 @@ import { IPotentiality, IPotentialitySimul } from '../data-structures/potentiali
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
 import { IPressureChunkPoint, IPressurePoint } from '../data-structures/pressure-point.interface';
 import { ITimeDuration } from '../data-structures/query.interface';
+import { IRange } from '../data-structures/range.interface';
 
 export const computePressure = (p: IPotentiality): number => {
   const space = R.sum(p.places.map(c => c.end - c.start));
@@ -72,7 +73,7 @@ const potentialsToPressurePoint = (potentialities: IPotentiality[]): IPressurePo
 
 export const updatePotentialsPressure = (
   potentialities: IPotentiality[],
-  materials: IMaterial[]
+  materials: IRange[]
 ): IPotentiality[] => {
   return potentialities.map(
     R.pipe(

@@ -76,6 +76,13 @@ test('will simplify pressure chunks', t => {
   t.true(isEqual({ start: 0, end: 10 }, pChunkB[0]) && pChunkB[0].pressure === 0.75);
 });
 
+test('will update potentials pressure', t => {
+  const pots = [potentialFactory({ min: 2, target: 2 }, [{ end: 2, start: 0 }], 1)];
+  const updated = updatePotentialsPressure(pots, [{ end: 1, start: 0 }]);
+  t.true(updated.length === 1);
+  t.true(updated[0].pressure === 2);
+});
+
 test('will materialize potentiality', t => {
   const toPlace = potentialFactory({ min: 1, target: 1 }, [{ end: 10, start: 0 }], 0.1);
   const pots = [
