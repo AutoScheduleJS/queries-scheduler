@@ -22,8 +22,8 @@ const potentialFactory = (dur: ITimeDuration, places: IRange[]): IPotentiality =
 };
 
 test('will compute pressure', t => {
-  t.true(computePressure(potentialFactory({ min: 1, target: 1 }, [{ end: 1, start: 0 }])) === 0.5);
+  t.true(computePressure(potentialFactory({ min: 1, target: 1 }, [{ end: 1, start: 0 }])) === 1);
   t.true(computePressure(potentialFactory({ min: 0, target: 1 }, [{ end: 1, start: 0 }])) === 0.5);
-  t.true(computePressure(potentialFactory({ min: 0, target: 1 }, [{ end: 2, start: 0 }])) === 1);
-  t.true(computePressure(potentialFactory({ min: 1, target: 1 }, [{ end: 2, start: 0 }])) === 1);
+  t.true(computePressure(potentialFactory({ min: 0, target: 1 }, [{ end: 2, start: 0 }])) === 0.25);
+  t.true(computePressure(potentialFactory({ min: 1, target: 1 }, [{ end: 2, start: 0 }])) === 0.5);
 });
