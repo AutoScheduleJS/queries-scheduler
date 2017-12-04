@@ -173,7 +173,7 @@ const placeSplittable = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]
   let materializedSpace = 0;
   const result: IMaterial[] = [];
   while (materializedSpace < toPlace.duration && sortedChunks.length > 0) {
-    const best = sortedChunks.pop() as IPressureChunk;
+    const best = { ...(sortedChunks.shift() as IPressureChunk) };
     const bestDur = best.end - best.start;
     if (bestDur > toPlace.duration) {
       best.end = best.start + toPlace.duration;
