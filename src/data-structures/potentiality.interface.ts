@@ -13,4 +13,5 @@ export interface IPotentialitySimul {
   readonly duration: number;
   readonly isSplittable: boolean;
   readonly places: ReadonlyArray<IRange>;
+  readonly [others: string]: any;
 }
