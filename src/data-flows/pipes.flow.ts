@@ -20,8 +20,16 @@ export const computePressureChunks = (
   config: IConfig,
   potentialities: IPotentiality[]
 ): IPressureChunk[] => {
-  const pressurePoints = potentialsToPressurePoint(potentialities);
-  const initChunk: IPressureChunk = { start: config.startDate, end: config.endDate, pressure: 0 };
+  const [first, ...pressurePoints] = reducePressurePoints([
+    { time: config.startDate, pressureDiff: 0 },
+    ...potentialsToPressurePoint(potentialities),
+    { time: config.endDate, pressureDiff: 0 },
+  ]);
+  const initChunk: IPressureChunk = {
+    end: first.time,
+    pressure: first.pressureDiff,
+    start: config.startDate,
+  };
   return R.unfold(R.partial(pressureChunkUnfolder, [pressurePoints]), [0, initChunk]);
 };
 
@@ -37,26 +45,29 @@ const pressureChunkUnfolder = (
   return [{ ...chunk, end: pp.time }, [index + 1, { start: pp.time, pressure }]];
 };
 
+const reducePressurePoints = R.pipe(
+  R.reduceBy(
+    (acc: IPressurePoint, cur: IPressurePoint) => ({
+      pressureDiff: acc.pressureDiff + cur.pressureDiff,
+      time: cur.time,
+    }),
+    { time: -1, pressureDiff: 0 },
+    pp => '' + pp.time
+  ),
+  Object.values
+) as (pp: IPressurePoint[]) => IPressurePoint[];
+
 const potentialsToPressurePoint = (potentialities: IPotentiality[]): IPressurePoint[] => {
-  const rawPP = R.flatten<any>(
-    potentialities.map(pot =>
-      pot.places.map(pla => [
-        { time: pla.start, pressureDiff: pot.pressure },
-        { time: pla.end, pressureDiff: -pot.pressure },
-      ])
+  return sortByTime(
+    R.flatten<any>(
+      potentialities.map(pot =>
+        pot.places.map(pla => [
+          { time: pla.start, pressureDiff: pot.pressure },
+          { time: pla.end, pressureDiff: -pot.pressure },
+        ])
+      )
     )
   );
-  return sortByTime(Object.values(
-    R.reduceBy(
-      (acc: IPressurePoint, cur: IPressurePoint) => ({
-        pressureDiff: acc.pressureDiff + cur.pressureDiff,
-        time: cur.time,
-      }),
-      { time: 0, pressureDiff: 0 },
-      pp => '' + pp.time,
-      rawPP
-    )
-  ) as IPressurePoint[]);
 };
 
 export const updatePotentialsPressure = (
