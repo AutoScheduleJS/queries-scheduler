@@ -7,7 +7,6 @@ import { IPotentiality, IPotentialitySimul } from '../data-structures/potentiali
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
 import { IPressureChunkPoint, IPressurePoint } from '../data-structures/pressure-point.interface';
 import { ITimeDuration } from '../data-structures/query.interface';
-import { IRange } from '../data-structures/range.interface';
 
 export const computePressure = (p: IPotentiality): number => {
   const space = R.sum(p.places.map(c => c.end - c.start));
@@ -143,7 +142,7 @@ const placeAtomic = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]): I
     throw new Error('No chunks available');
   }
   const bestChunk = sortedChunks.find((chunk: IPressureChunk) => {
-    return toPlace.places.some(isDuring<IRange>(chunk));
+    return toPlace.places.some(isDuring(chunk));
   });
   if (!bestChunk) {
     throw new Error('No chunks available');
