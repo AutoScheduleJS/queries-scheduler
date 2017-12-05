@@ -92,7 +92,6 @@ const findMaxFinitePlacement = (
   updatePP: (m: IMaterial[]) => IPotentiality[],
   pressure: IPressureChunk[]
 ): [IMaterial[], IPotentiality[]] => {
-  debugger;
   const minDur = toPlace.duration.min;
   let durationDelta = toPlace.duration.target - minDur;
   let testDuration = minDur + durationDelta / 2;
@@ -108,6 +107,7 @@ const findMaxFinitePlacement = (
     durationDelta /= 2;
     testDuration = avgPre > myPre ? testDuration - durationDelta : testDuration + durationDelta;
   } while (Math.abs(avgPre - myPre) >= 0.1);
+  throwIfInvalid(validatePotentials)(pots);
   return [materials, pots];
 };
 
@@ -145,6 +145,9 @@ const computeContiguousPressureChunk = (
   duration: number,
   chunks: IPressureChunk[]
 ): IPressureChunk[] => {
+  if (!chunks.length) {
+    return [];
+  }
   const firstTime = chunks[0].start;
   const lastTime = chunks[chunks.length - 1].end;
   return R.unnest(
