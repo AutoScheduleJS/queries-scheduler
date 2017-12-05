@@ -92,21 +92,22 @@ const findMaxFinitePlacement = (
   updatePP: (m: IMaterial[]) => IPotentiality[],
   pressure: IPressureChunk[]
 ): [IMaterial[], IPotentiality[]] => {
+  debugger;
   const minDur = toPlace.duration.min;
-  const durationDelta = toPlace.duration.target - minDur;
+  let durationDelta = toPlace.duration.target - minDur;
   let testDuration = minDur + durationDelta / 2;
-  let avgSat: number = 0;
-  let mySat: number = 0;
+  let avgPre: number = 0;
+  let myPre: number = 0;
   let materials: IMaterial[] = [];
   let pots: IPotentiality[] = [];
   do {
     materials = simulatePlacement({ ...toPlace, duration: testDuration }, pressure);
     pots = updatePP(materials);
-    avgSat = potentialsToMeanPressure(pots);
-    mySat = computePressureWithSpace(toPlace, testDuration);
-    testDuration =
-      avgSat < mySat ? testDuration - testDuration / 2 : testDuration + testDuration / 2;
-  } while (avgSat - mySat < 0.1);
+    avgPre = potentialsToMeanPressure(pots);
+    myPre = computePressureWithSpace(toPlace, testDuration);
+    durationDelta /= 2;
+    testDuration = avgPre > myPre ? testDuration - durationDelta : testDuration + durationDelta;
+  } while (Math.abs(avgPre - myPre) >= 0.1);
   return [materials, pots];
 };
 
@@ -115,7 +116,6 @@ export const materializePotentiality = (
   updatePP: (m: IMaterial[]) => IPotentiality[],
   pressure: IPressureChunk[]
 ): [IMaterial[], IPotentiality[]] => {
-  debugger;
   const minMaterials = simulatePlacement(potToSimul('min', toPlace), pressure);
   const maxMaterials = simulatePlacement(potToSimul('target', toPlace), pressure);
   const minPots = updatePP(minMaterials);
@@ -127,16 +127,6 @@ export const materializePotentiality = (
     return [maxMaterials, maxPots];
   }
   return findMaxFinitePlacement(toPlace, updatePP, pressure);
-  // const durationDiff = toPlace.duration.target - toPlace.duration.min;
-  // const idealDuration =
-  //   toPlace.duration.min + getIntersectionPressure(durationDiff, [minAvg, maxAvg]);
-  // const materials = simulatePlacement(
-  //   { isSplittable: toPlace.isSplittable, places: toPlace.places, duration: idealDuration },
-  //   pressure
-  // );
-  // const updatedPotentials = updatePP(materials);
-  // throwIfInvalid(validatePotentials)(updatedPotentials);
-  // return [materials, updatedPotentials];
 };
 
 const getProportionalPressure = (
@@ -204,10 +194,10 @@ const placeSplittable = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]
   const result: IMaterial[] = [];
   while (materializedSpace < toPlace.duration && sortedChunks.length > 0) {
     const best = { ...(sortedChunks.shift() as IPressureChunk) };
-    const bestDur = best.end - best.start;
-    if (bestDur > toPlace.duration) {
-      best.end = best.start + toPlace.duration;
+    if (materializedSpace + best.end - best.start > toPlace.duration) {
+      best.end = best.start + (toPlace.duration - materializedSpace);
     }
+    const bestDur = best.end - best.start;
     materializedSpace += bestDur;
     result.push({
       end: best.end,
@@ -233,11 +223,6 @@ const throwIfInvalid = (validator: (d: any) => boolean) =>
   R.unless(validator, d => {
     throw new Error(`Invalid ${d}`);
   });
-
-const getIntersectionPressure = (durDiff: number, [minAvg, maxAvg]: [number, number]): number => {
-  const avgSeg = minAvg - maxAvg;
-  return -minAvg * durDiff ** 2 / (-durDiff * (avgSeg + 1));
-};
 
 const potentialsToMeanPressure = R.pipe(
   (pots: IPotentiality[]) =>

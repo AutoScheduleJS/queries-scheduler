@@ -95,7 +95,7 @@ test('will materialize atomic potentiality', t => {
   t.true(materials[0].start === 5 && materials[0].end === 6);
 });
 
-test.only('will materialize splittable potentiality', t => {
+test('will materialize splittable potentiality', t => {
   const toPlace: IPotentiality = {
     ...potentialFactory({ min: 1, target: 10 }, [{ end: 10, start: 0 }], 0.6),
     isSplittable: true,
@@ -107,7 +107,7 @@ test.only('will materialize splittable potentiality', t => {
     updatePotentialsPressure.bind(null, pots),
     pChunks
   )[0];
-  t.true(materials.length === 2);
+  t.true(materials.length === 3);
 });
 
 test('materialize will throw if not placable', t => {
