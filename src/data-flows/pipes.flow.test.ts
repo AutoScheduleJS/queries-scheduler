@@ -3,6 +3,7 @@ import { isEqual } from 'intervals-fn';
 
 import { IConfig } from '../data-structures/config.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
+import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
 import { ITimeDuration } from '../data-structures/query.interface';
 import { IRange } from '../data-structures/range.interface';
 
@@ -83,19 +84,51 @@ test('will update potentials pressure', t => {
   t.true(updated[0].pressure === 2);
 });
 
-test('will materialize potentiality', t => {
+test('will materialize atomic potentiality', t => {
   const toPlace = potentialFactory({ min: 1, target: 1 }, [{ end: 10, start: 0 }], 0.1);
   const pots = [
     potentialFactory({ min: 5, target: 5 }, [{ end: 5, start: 0 }], 1),
     potentialFactory({ min: 4, target: 4 }, [{ end: 10, start: 6 }], 1),
   ];
-  const pChunks = computePressureChunks({ startDate: 0, endDate: 0 }, pots);
+  const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, pots);
   const materials = materializePotentiality(toPlace, () => pots, pChunks)[0];
   t.true(materials.length === 1);
   t.true(materials[0].start === 5 && materials[0].end === 6);
 });
 
-test('materialize will throw if not placable', t => {
+test('will materialize splittable potentiality', t => {
+  const toPlace: IPotentiality = {
+    ...potentialFactory({ min: 1, target: 9 }, [{ end: 10, start: 0 }], 0.6),
+    isSplittable: true,
+  };
+  const pots = [potentialFactory({ min: 5, target: 5 }, [{ end: 8, start: 3 }], 1)];
+  const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, pots);
+  const materials = materializePotentiality(
+    toPlace,
+    updatePotentialsPressure.bind(null, pots),
+    pChunks
+  )[0];
+  t.true(materials.length === 2);
+  t.true(materials[0].start === 0 && materials[0].end === 3);
+  t.true(materials[1].start === 8 && materials[1].end === 10);
+});
+
+test('materialize will throw if no place available', t => {
+  t.plan(2);
+  const toPlace = potentialFactory({ min: 5, target: 10 }, [{ end: 10, start: 0 }], 0.6);
+  const pChunks: IPressureChunk[] = [];
+  t.throws(
+    materializePotentiality.bind(null, toPlace, updatePotentialsPressure.bind(null, []), pChunks),
+    'No chunks available'
+  );
+  const pChunks2 = computePressureChunks({ startDate: 42, endDate: 52 }, []);
+  t.throws(
+    materializePotentiality.bind(null, toPlace, updatePotentialsPressure.bind(null, []), pChunks2),
+    'No chunks available'
+  );
+});
+
+test('materialize will throw if not placable without conflict', t => {
   const toPlace = potentialFactory({ min: 5, target: 10 }, [{ end: 10, start: 0 }], 0.6);
   const pots = [
     potentialFactory({ min: 5, target: 5 }, [{ end: 5, start: 0 }], 0.5),
