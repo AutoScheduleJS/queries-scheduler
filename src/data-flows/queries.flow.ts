@@ -5,7 +5,12 @@ import * as R from 'ramda';
 import { IConfig } from '../data-structures/config.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { GoalKind, RestrictionCondition } from '../data-structures/query.enum';
-import { IQuery, ITimeDuration, ITimeRestriction } from '../data-structures/query.interface';
+import {
+  IQuery,
+  ITimeBoundary,
+  ITimeDuration,
+  ITimeRestriction,
+} from '../data-structures/query.interface';
 import { IRange } from '../data-structures/range.interface';
 
 import { computePressure } from './pipes.flow';
@@ -13,6 +18,7 @@ import { computePressure } from './pipes.flow';
 type maskFn = (tm: IRange) => IRange[];
 type mapRange = (r: IRange[], tm: IRange) => IRange[];
 type toNumber = (o: any) => number;
+type toTBToNumber = (t: keyof ITimeBoundary) => (o: any) => number;
 type getFirstFn = (rest: IRange) => IRange;
 type unfoldRange = (seed: IRange) => false | [IRange, IRange];
 type toTimeDur = (o: any) => ITimeDuration;
@@ -114,12 +120,13 @@ export const updateChildren = (potentials: IPotentiality[], mask: IRange[]): IPo
   );
 };
 
-const ifHasStartEnd = R.ifElse(R.and(R.has('start'), R.has('end')));
+const ifHasStart = R.ifElse(R.has('start'));
+const ifHasEnd = R.ifElse(R.has('end'));
+const ifHasDuration = R.ifElse(R.has('duration'));
 const queryIsSplittable = (query: IQuery) =>
   query.goal ? query.goal.kind === GoalKind.Splittable : false;
-const getTarget: (s: string) => toNumber = kind => R.pathOr(0, [kind, 'target']);
-const qStart: toNumber = getTarget('start');
-const qEnd: toNumber = getTarget('end');
+const qStart: toTBToNumber = (t: keyof ITimeBoundary) => R.pathOr(0, ['start', t]);
+const qEnd: toTBToNumber = (t: keyof ITimeBoundary) => R.pathOr(0, ['end', t]);
 const qDuration: toTimeDur = R.pathOr({ min: 0, target: 0 }, ['duration']);
 const gQuantity: toTimeDur = R.pathOr({ min: 0, target: 0 }, ['goal', 'quantity']);
 const gQuantityTarget: toNumber = R.pipe(gQuantity, R.pathOr(1, ['target']) as toNumber);
@@ -155,15 +162,22 @@ export const goalToPotentiality = (config: IConfig) => (query: IQuery): IPotenti
   }));
 };
 
-const atomicToDuration = ifHasStartEnd(
-  R.pipe(R.converge(R.subtract, [qEnd, qStart]), R.assoc('target', R.__, {})),
-  qDuration
+const atomicToDurationNb = (tStart: keyof ITimeBoundary, tEnd: keyof ITimeBoundary) =>
+  R.converge(R.subtract, [qEnd(tEnd), qStart(tStart)]);
+
+const atomicToDuration = ifHasDuration(
+  qDuration,
+  R.applySpec<ITimeDuration>({
+    min: atomicToDurationNb('max', 'min'),
+    target: atomicToDurationNb('target', 'target'),
+  })
 );
+
 const atomicToChildren = (c: IConfig) =>
-  ifHasStartEnd(
-    R.applySpec<IRange>({ start: qStart, end: qEnd }),
-    R.always<IRange>({ start: c.startDate, end: c.endDate })
-  );
+  R.applySpec<IRange>({
+    end: ifHasEnd(qEnd('target'), R.always(c.endDate)),
+    start: ifHasStart(qStart('target'), R.always(c.startDate)),
+  });
 
 export const atomicToPotentiality = (config: IConfig) => (query: IQuery): IPotentiality[] => {
   const duration = atomicToDuration(query) as ITimeDuration;
