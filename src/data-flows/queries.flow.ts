@@ -145,7 +145,7 @@ const goalToSubpipes = (config: IConfig, query: IQuery): IRange[] => {
   const maxDuration = config.endDate - config.startDate;
   const subpipeCount = Math.floor(maxDuration / timeloop);
   return R.times(
-    i => ({ start: start + timeloop * i, end: start - 1 + timeloop * (i + 1) }),
+    i => ({ start: start + timeloop * i, end: start + timeloop * (i + 1) }),
     subpipeCount
   );
 };

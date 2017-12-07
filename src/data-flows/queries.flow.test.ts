@@ -4,6 +4,7 @@ import * as R from 'ramda';
 import { atomicToPotentiality, goalToPotentiality } from './queries.flow';
 
 import { IConfig } from '../data-structures/config.interface';
+import { IPotentiality } from '../data-structures/potentiality.interface';
 import { GoalKind, QueryKind } from '../data-structures/query.enum';
 import { IGoal, IQuery, ITimeBoundary, ITimeDuration } from '../data-structures/query.interface';
 
@@ -71,7 +72,19 @@ test('will convert atomic to potentiality (start, end)', t => {
 
 test('will convert goal to potentiality', t => {
   const config: IConfig = { startDate: 0, endDate: 10 };
-  const qgoal: IQuery = queryFactory(goal(GoalKind.Atomic, timeDuration(2), 5));
-  const pot = goalToPotentiality(config)(qgoal);
-  t.true(pot.length === 4);
+  const qgoal1: IQuery = queryFactory(goal(GoalKind.Atomic, timeDuration(2), 5));
+  const qgoal2: IQuery = queryFactory(goal(GoalKind.Splittable, timeDuration(2.5), 2.5));
+  const pot1 = goalToPotentiality(config)(qgoal1);
+  const pot2 = goalToPotentiality(config)(qgoal2);
+  const testPoten = (poten: IPotentiality[]) => {
+    t.true(poten.length === 4);
+    t.true(poten[0].places.length === 1);
+    t.true(poten[0].places[0].start === 0);
+    t.true(poten[0].places[0].end === 2.5);
+    t.true(poten[1].places.length === 1);
+    t.true(poten[1].places[0].start === 2.5);
+    t.true(poten[1].places[0].end === 5);
+  };
+  testPoten(pot1);
+  testPoten(pot2);
 });
