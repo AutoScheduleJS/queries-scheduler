@@ -5,6 +5,7 @@ import {
   atomicToPotentiality,
   goalToPotentiality,
   mapToHourRange,
+  mapToMonthRange,
   mapToTimeRestriction,
 } from './queries.flow';
 
@@ -75,6 +76,17 @@ test('will map from hour timeRestrictions', t => {
   t.true(result2[0].end === startNb + 5 * 3600000);
   t.true(result2[1].start === startNb + 13 * 3600000);
   t.true(result2[1].end === endNb);
+});
+
+test('will map from month timeRestrictions', t => {
+  const startNb = +new Date(2017, 0, 1, 0, 0, 0, 0);
+  const endNb = +new Date(2017, 11, 31, 0, 0, 0, 0);
+  const tr1 = timeRestriction(RestrictionCondition.InRange, [[6, 7]]);
+  const result1 = mapToTimeRestriction(tr1, mapToMonthRange)([{ end: endNb, start: startNb }]);
+
+  t.true(result1.length === 1);
+  t.true(new Date(result1[0].start).getMonth() === 6);
+  t.true(new Date(result1[0].end).getMonth() === 7);
 });
 
 test('will convert atomic to potentiality (start, duration)', t => {
