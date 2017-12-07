@@ -1,11 +1,16 @@
 import test from 'ava';
 import * as R from 'ramda';
 
-import { atomicToPotentiality, goalToPotentiality } from './queries.flow';
+import {
+  atomicToPotentiality,
+  goalToPotentiality,
+  mapToHourRange,
+  mapToTimeRestriction,
+} from './queries.flow';
 
 import { IConfig } from '../data-structures/config.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
-import { GoalKind, QueryKind } from '../data-structures/query.enum';
+import { GoalKind, QueryKind, RestrictionCondition } from '../data-structures/query.enum';
 import { IGoal, IQuery, ITimeBoundary, ITimeDuration } from '../data-structures/query.interface';
 
 const name = (nameStr?: string): Record<'name', string> => ({ name: nameStr || 'query' });
@@ -37,19 +42,46 @@ const timeDuration = (target: number, minTime?: number): ITimeDuration => {
 const duration = (dur: ITimeDuration): Record<'duration', ITimeDuration> => {
   return R.assoc('duration', dur, {});
 };
-
+const timeRestriction = (
+  condition: RestrictionCondition,
+  ranges: ReadonlyArray<[number, number]>
+) => {
+  return {
+    condition,
+    ranges,
+  };
+};
 const goal = (kindEn: GoalKind, quantity: ITimeDuration, time: number): Record<'goal', IGoal> => ({
   goal: { kind: kindEn, quantity, time },
 });
-
 const queryFactory = (...factories: Array<Partial<IQuery>>): IQuery => {
   return R.mergeAll([id(), name(), kind(), ...factories]) as IQuery;
 };
+
+test('will map from hour timeRestrictions', t => {
+  const startNb = new Date().setHours(0, 0, 0, 0);
+  const endNb = startNb + 1 * 24 * 3600000;
+  const tr1 = timeRestriction(RestrictionCondition.InRange, [[5, 13]]);
+  const tr2 = timeRestriction(RestrictionCondition.OutRange, [[5, 13]]);
+  const result1 = mapToTimeRestriction(tr1, mapToHourRange)([{ end: endNb, start: startNb }]);
+  const result2 = mapToTimeRestriction(tr2, mapToHourRange)([{ end: endNb, start: startNb }]);
+
+  t.true(result1.length === 1);
+  t.true(result1[0].start === startNb + 5 * 3600000);
+  t.true(result1[0].end === startNb + 13 * 3600000);
+
+  t.true(result2.length === 2);
+  t.true(result2[0].start === startNb);
+  t.true(result2[0].end === startNb + 5 * 3600000);
+  t.true(result2[1].start === startNb + 13 * 3600000);
+  t.true(result2[1].end === endNb);
+});
 
 test('will convert atomic to potentiality (start, duration)', t => {
   const config: IConfig = { startDate: 0, endDate: 10 };
   const atomic: IQuery = queryFactory(start(5), duration(timeDuration(1)));
   const pot = atomicToPotentiality(config)(atomic);
+
   t.true(pot.length === 1);
   t.false(pot[0].isSplittable);
   t.true(pot[0].places.length === 1);
@@ -62,6 +94,7 @@ test('will convert atomic to potentiality (start, end)', t => {
   const config: IConfig = { startDate: 0, endDate: 10 };
   const atomic: IQuery = queryFactory(start(5), end(6));
   const pot = atomicToPotentiality(config)(atomic);
+
   t.true(pot.length === 1);
   t.false(pot[0].isSplittable);
   t.true(pot[0].places.length === 1);

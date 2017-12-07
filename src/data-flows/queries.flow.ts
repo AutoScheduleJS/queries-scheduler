@@ -80,11 +80,11 @@ const addToTimestamp = (
 const rangesUnfolder = (end: number, kind: moment.unitOfTime.DurationConstructor) => (
   range: IRange
 ): false | [IRange, IRange] => {
-  const nextRange = R.map(addToTimestamp(1, kind), range);
   if (range.start >= end) {
     return false;
   }
-  return [nextRange, nextRange];
+  const nextRange = R.map(addToTimestamp(1, kind), range);
+  return [range, nextRange];
 };
 
 const getFirstHourRange = R.curry((mask: IRange, restrict: IRange): IRange => {
@@ -103,7 +103,7 @@ const getMaskFilterFn = (tr: ITimeRestriction, mapFn: mapRange): maskFn => {
       tr.condition === RestrictionCondition.InRange ? ranges : complement(mask, ranges),
     [
       R.converge(intersect, [
-        R.partial(mapFn, tr.ranges.map(r => ({ start: r[0], end: r[1] }))),
+        R.partial(mapFn, [tr.ranges.map(r => ({ start: r[0], end: r[1] }))]),
         R.identity,
       ]),
       R.identity,
