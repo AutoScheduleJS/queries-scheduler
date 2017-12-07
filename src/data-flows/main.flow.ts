@@ -12,7 +12,6 @@ import {
   mapToMonthRange,
   mapToTimeRestriction,
   mapToWeekdayRange,
-  updateChildren,
 } from '../data-flows/queries.flow';
 
 import { IConfig } from '../data-structures/config.interface';
@@ -41,7 +40,7 @@ const queriesToPipeline = (config: IConfig, queries: IQuery[]): IMaterial[] => {
 const queriesToPotentialities = (config: IConfig, queries: IQuery[]): IPotentiality[] => {
   return R.unnest(
     queries.map(
-      R.converge(updateChildren, [
+      R.converge(updatePotentialsPressure, [
         R.ifElse(R.has('goal'), goalToPotentiality(config), atomicToPotentiality(config)),
         queryToMask(config),
       ])

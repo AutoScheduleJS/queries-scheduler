@@ -13,8 +13,6 @@ import {
 } from '../data-structures/query.interface';
 import { IRange } from '../data-structures/range.interface';
 
-import { computePressure } from './pipes.flow';
-
 type maskFn = (tm: IRange) => IRange[];
 type mapRange = (r: IRange[], tm: IRange) => IRange[];
 type toNumber = (o: any) => number;
@@ -108,15 +106,6 @@ const getMaskFilterFn = (tr: ITimeRestriction, mapFn: mapRange): maskFn => {
       ]),
       R.identity,
     ]
-  );
-};
-
-export const updateChildren = (potentials: IPotentiality[], mask: IRange[]): IPotentiality[] => {
-  return potentials.map(
-    R.pipe(
-      (p: IPotentiality) => ({ ...p, children: intersect(mask, p.places[0]) }),
-      (p: IPotentiality) => ({ ...p, pressure: computePressure(p) })
-    )
   );
 };
 
