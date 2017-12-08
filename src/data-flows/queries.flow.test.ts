@@ -7,6 +7,7 @@ import {
   mapToHourRange,
   mapToMonthRange,
   mapToTimeRestriction,
+  mapToWeekdayRange,
 } from './queries.flow';
 
 import { IConfig } from '../data-structures/config.interface';
@@ -59,6 +60,19 @@ const queryFactory = (...factories: Array<Partial<IQuery>>): IQuery => {
   return R.mergeAll([id(), name(), kind(), ...factories]) as IQuery;
 };
 
+test('will map nothing when no timeRestrictions', t => {
+  const startNb = new Date().setHours(0, 0, 0, 0);
+  const endNb = startNb + 1 * 24 * 3600000;
+  const tr = timeRestriction(RestrictionCondition.InRange, []);
+  const result1 = mapToTimeRestriction(tr, mapToHourRange)([{ end: endNb, start: startNb }]);
+  const result2 = mapToTimeRestriction(undefined, mapToHourRange)([{ end: endNb, start: startNb }]);
+
+  t.true(result1.length === 0);
+  t.true(result2.length === 1);
+  t.true(result2[0].start === startNb);
+  t.true(result2[0].end === endNb);
+});
+
 test('will map from hour timeRestrictions', t => {
   const startNb = new Date().setHours(0, 0, 0, 0);
   const endNb = startNb + 1 * 24 * 3600000;
@@ -76,6 +90,34 @@ test('will map from hour timeRestrictions', t => {
   t.true(result2[0].end === startNb + 5 * 3600000);
   t.true(result2[1].start === startNb + 13 * 3600000);
   t.true(result2[1].end === endNb);
+});
+
+test('will map from weekday timeRestrictions when during range', t => {
+  const startNb = +new Date(2017, 11, 3, 0, 0, 0, 0);
+  const endNb = +new Date(2017, 11, 9, 0, 0, 0, 0);
+  const tr1 = timeRestriction(RestrictionCondition.InRange, [[3, 6]]);
+  const result1 = mapToTimeRestriction(tr1, mapToWeekdayRange)([{ end: endNb, start: startNb }]);
+
+  t.true(result1.length === 1);
+  t.true(new Date(result1[0].start).getDay() === 3);
+  t.true(new Date(result1[0].end).getDay() === 6);
+});
+
+test('will map from weekday timeRestrictions when overlapping range', t => {
+  const startNb1 = +new Date(2017, 11, 7, 0, 0, 0, 0);
+  const endNb1 = +new Date(2017, 11, 9, 0, 0, 0, 0);
+  const startNb2 = +new Date(2017, 11, 3, 0, 0, 0, 0);
+  const endNb2 = +new Date(2017, 11, 8, 0, 0, 0, 0);
+  const tr1 = timeRestriction(RestrictionCondition.InRange, [[3, 6]]);
+  const result1 = mapToTimeRestriction(tr1, mapToWeekdayRange)([{ end: endNb1, start: startNb1 }]);
+  const result2 = mapToTimeRestriction(tr1, mapToWeekdayRange)([{ end: endNb2, start: startNb2 }]);
+
+  t.true(result1.length === 1);
+  t.true(new Date(result1[0].start).getDay() === 4);
+  t.true(new Date(result1[0].end).getDay() === 6);
+  t.true(result2.length === 1);
+  t.true(new Date(result2[0].start).getDay() === 3);
+  t.true(new Date(result2[0].end).getDay() === 5);
 });
 
 test('will map from month timeRestrictions when during range', t => {
