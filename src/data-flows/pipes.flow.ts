@@ -75,13 +75,16 @@ const potentialsToPressurePoint = (potentialities: IPotentiality[]): IPressurePo
   );
 };
 
-export const updatePotentialsPressure = (
+export const updatePotentialsPressure = (method: 'substract' | 'intersect') => (
   potentialities: IPotentiality[],
   masks: IRange[]
 ): IPotentiality[] => {
   return potentialities.map(
     R.pipe(
-      (p: IPotentiality) => ({ ...p, places: substract(p.places, masks) }),
+      (p: IPotentiality) => ({
+        ...p,
+        places: method === 'substract' ? substract(p.places, masks) : intersect(p.places, masks),
+      }),
       (p: IPotentiality) => ({ ...p, pressure: computePressure(p) })
     )
   );

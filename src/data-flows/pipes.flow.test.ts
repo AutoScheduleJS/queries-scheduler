@@ -79,7 +79,7 @@ test('will simplify pressure chunks', t => {
 
 test('will update potentials pressure', t => {
   const pots = [potentialFactory({ min: 2, target: 2 }, [{ end: 2, start: 0 }], 1)];
-  const updated = updatePotentialsPressure(pots, [{ end: 1, start: 0 }]);
+  const updated = updatePotentialsPressure('substract')(pots, [{ end: 1, start: 0 }]);
   t.true(updated.length === 1);
   t.true(updated[0].pressure === 2);
 });
@@ -105,7 +105,7 @@ test('will materialize splittable potentiality', t => {
   const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, pots);
   const materials = materializePotentiality(
     toPlace,
-    updatePotentialsPressure.bind(null, pots),
+    updatePotentialsPressure('substract').bind(null, pots),
     pChunks
   )[0];
   t.true(materials.length === 2);
@@ -118,12 +118,22 @@ test('materialize will throw if no place available', t => {
   const toPlace = potentialFactory({ min: 5, target: 10 }, [{ end: 10, start: 0 }], 0.6);
   const pChunks: IPressureChunk[] = [];
   t.throws(
-    materializePotentiality.bind(null, toPlace, updatePotentialsPressure.bind(null, []), pChunks),
+    materializePotentiality.bind(
+      null,
+      toPlace,
+      updatePotentialsPressure('substract').bind(null, []),
+      pChunks
+    ),
     'No chunks available'
   );
   const pChunks2 = computePressureChunks({ startDate: 42, endDate: 52 }, []);
   t.throws(
-    materializePotentiality.bind(null, toPlace, updatePotentialsPressure.bind(null, []), pChunks2),
+    materializePotentiality.bind(
+      null,
+      toPlace,
+      updatePotentialsPressure('substract').bind(null, []),
+      pChunks2
+    ),
     'No chunks available'
   );
 });
@@ -136,6 +146,11 @@ test('materialize will throw if not placable without conflict', t => {
   ];
   const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, pots);
   t.throws(
-    materializePotentiality.bind(null, toPlace, updatePotentialsPressure.bind(null, pots), pChunks)
+    materializePotentiality.bind(
+      null,
+      toPlace,
+      updatePotentialsPressure('substract').bind(null, pots),
+      pChunks
+    )
   );
 });

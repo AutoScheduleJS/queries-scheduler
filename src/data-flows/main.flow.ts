@@ -40,7 +40,7 @@ const queriesToPipeline = (config: IConfig, queries: IQuery[]): IMaterial[] => {
 const queriesToPotentialities = (config: IConfig, queries: IQuery[]): IPotentiality[] => {
   return R.unnest(
     queries.map(
-      R.converge(updatePotentialsPressure, [
+      R.converge(updatePotentialsPressure('intersect'), [
         R.ifElse(R.has('goal'), goalToPotentiality(config), atomicToPotentiality(config)),
         queryToMask(config),
       ])
@@ -59,7 +59,7 @@ const pipelineUnfolder = (
   const newPotentials = R.without([toPlace], potentials);
   return materializePotentiality(
     toPlace,
-    R.partial(updatePotentialsPressure, [newPotentials]),
+    R.partial(updatePotentialsPressure('substract'), [newPotentials]),
     computePressureChunks(config, newPotentials)
   );
 };
