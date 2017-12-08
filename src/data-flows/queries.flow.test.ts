@@ -78,7 +78,7 @@ test('will map from hour timeRestrictions', t => {
   t.true(result2[1].end === endNb);
 });
 
-test('will map from month timeRestrictions', t => {
+test('will map from month timeRestrictions when during range', t => {
   const startNb = +new Date(2017, 0, 1, 0, 0, 0, 0);
   const endNb = +new Date(2017, 11, 31, 0, 0, 0, 0);
   const tr1 = timeRestriction(RestrictionCondition.InRange, [[6, 7]]);
@@ -87,6 +87,23 @@ test('will map from month timeRestrictions', t => {
   t.true(result1.length === 1);
   t.true(new Date(result1[0].start).getMonth() === 6);
   t.true(new Date(result1[0].end).getMonth() === 7);
+});
+
+test('will map from month timeRestrictions when overlapping range', t => {
+  const startNb1 = +new Date(2017, 6, 1, 0, 0, 0, 0);
+  const startNb2 = +new Date(2017, 1, 1, 0, 0, 0, 0);
+  const endNb1 = +new Date(2017, 11, 31, 0, 0, 0, 0);
+  const endNb2 = +new Date(2017, 6, 31, 0, 0, 0, 0);
+  const tr1 = timeRestriction(RestrictionCondition.InRange, [[4, 7]]);
+  const result1 = mapToTimeRestriction(tr1, mapToMonthRange)([{ end: endNb1, start: startNb1 }]);
+  const result2 = mapToTimeRestriction(tr1, mapToMonthRange)([{ end: endNb2, start: startNb2 }]);
+
+  t.true(result1.length === 1);
+  t.true(new Date(result1[0].start).getMonth() === 6);
+  t.true(new Date(result1[0].end).getMonth() === 7);
+  t.true(result1.length === 1);
+  t.true(new Date(result2[0].end).getMonth() === 6);
+  t.true(new Date(result2[0].start).getMonth() === 4);
 });
 
 test('will convert atomic to potentiality (start, duration)', t => {
