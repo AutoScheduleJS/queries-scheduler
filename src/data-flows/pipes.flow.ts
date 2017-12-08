@@ -125,7 +125,7 @@ export const materializePotentiality = (
   const maxPots = updatePP(maxMaterials);
   const minAvg = potentialsToMeanPressure(minPots);
   const maxAvg = potentialsToMeanPressure(maxPots);
-  if (minAvg === maxAvg) {
+  if (minAvg === maxAvg || (Number.isNaN(minAvg) && Number.isNaN(maxAvg))) {
     throwIfInvalid(validatePotentials)(minPots);
     return [maxMaterials, maxPots];
   }
@@ -162,6 +162,10 @@ const computeContiguousPressureChunk = (
     .filter(c => c.start >= firstTime && c.end <= lastTime)
     .map(c => {
       // [start, end] & chunks[] --> chunks cut to start end, conserving their data
+      const inter = intersect(c, chunks);
+      if (!inter.length) {
+        return null;
+      }
       return intersect(c, chunks).reduce((acc, curr) => ({
         ...acc,
         pressure: getProportionalPressure(
@@ -171,19 +175,20 @@ const computeContiguousPressureChunk = (
           curr.pressure
         ),
       }));
-    });
+    })
+    .filter(p => p != null) as IPressureChunk[];
 };
 
 const placeAtomic = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]): IMaterial[] => {
   const sortedChunks = sortByPressure(computeContiguousPressureChunk(toPlace.duration, pressure));
   if (sortedChunks.length === 0) {
-    throw new Error('No chunks available');
+    return [];
   }
   const bestChunk = sortedChunks.find((chunk: IPressureChunk) => {
     return toPlace.places.some(isDuring(chunk));
   });
   if (!bestChunk) {
-    throw new Error('No chunks available');
+    return [];
   }
   return [
     {

@@ -25,9 +25,10 @@ test('will schedule queries', async t => {
     endDate: +moment().add(1, 'days'),
     startDate: Date.now(),
   };
+  const durTarget: number = +dur(1.5, 'hours');
   const queries: IQuery[] = [
     {
-      duration: { min: +dur(1, 'hours'), target: +dur(1.5, 'hours') },
+      duration: { min: +dur(1, 'hours'), target: durTarget },
       id: 1,
       kind: QueryKind.Atomic,
       name: 'atomic 1',
@@ -35,4 +36,6 @@ test('will schedule queries', async t => {
   ];
   const result = await schedule(config, queries);
   t.true(result.length === 1);
+  t.true(result[0].start === config.startDate);
+  t.true(result[0].end === config.startDate + durTarget);
 });
