@@ -121,11 +121,14 @@ export const materializePotentiality = (
 ): [IMaterial[], IPotentiality[]] => {
   const minMaterials = simulatePlacement(potToSimul('min', toPlace), pressure);
   const maxMaterials = simulatePlacement(potToSimul('target', toPlace), pressure);
+  if (!minMaterials.length && !maxMaterials.length) {
+    throw new Error('No chunk available.');
+  }
   const minPots = updatePP(minMaterials);
   const maxPots = updatePP(maxMaterials);
   const minAvg = potentialsToMeanPressure(minPots);
   const maxAvg = potentialsToMeanPressure(maxPots);
-  if (minAvg === maxAvg) {
+  if (minAvg === maxAvg || (Number.isNaN(minAvg) && Number.isNaN(maxAvg))) {
     throwIfInvalid(validatePotentials)(minPots);
     return [maxMaterials, maxPots];
   }
@@ -144,6 +147,18 @@ const getProportionalPressure = (
   return (newPress1 + newPress2) / 2;
 };
 
+const firstTimeRange = (ranges: IRange[]): number => ranges[0].start;
+const lastTimeRange = (ranges: IRange[]): number => ranges[ranges.length - 1].end;
+const scanPressure = (acc: IPressureChunk, curr: IPressureChunk) => ({
+  ...acc,
+  pressure: getProportionalPressure(
+    acc.end - acc.start,
+    acc.pressure,
+    curr.end - curr.start,
+    curr.pressure
+  ),
+});
+
 const computeContiguousPressureChunk = (
   duration: number,
   chunks: IPressureChunk[]
@@ -151,39 +166,33 @@ const computeContiguousPressureChunk = (
   if (!chunks.length) {
     return [];
   }
-  const firstTime = chunks[0].start;
-  const lastTime = chunks[chunks.length - 1].end;
   return R.unnest(
     chunks.map(c => [
       { start: c.start, end: c.start + duration },
       { end: c.end, start: c.end - duration },
     ])
   )
-    .filter(c => c.start >= firstTime && c.end <= lastTime)
+    .filter(c => c.start >= firstTimeRange(chunks) && c.end <= lastTimeRange(chunks))
     .map(c => {
-      // [start, end] & chunks[] --> chunks cut to start end, conserving their data
-      return intersect(c, chunks).reduce((acc, curr) => ({
-        ...acc,
-        pressure: getProportionalPressure(
-          acc.end - acc.start,
-          acc.pressure,
-          curr.end - curr.start,
-          curr.pressure
-        ),
-      }));
-    });
+      const inter = intersect(c, chunks);
+      if (!inter.length) {
+        return null;
+      }
+      return intersect(c, chunks).reduce(scanPressure);
+    })
+    .filter(p => p != null) as IPressureChunk[];
 };
 
 const placeAtomic = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]): IMaterial[] => {
   const sortedChunks = sortByPressure(computeContiguousPressureChunk(toPlace.duration, pressure));
   if (sortedChunks.length === 0) {
-    throw new Error('No chunks available');
+    return [];
   }
   const bestChunk = sortedChunks.find((chunk: IPressureChunk) => {
     return toPlace.places.some(isDuring(chunk));
   });
   if (!bestChunk) {
-    throw new Error('No chunks available');
+    return [];
   }
   return [
     {

@@ -96,6 +96,15 @@ test('will materialize atomic potentiality', t => {
   t.true(materials[0].start === 5 && materials[0].end === 6);
 });
 
+test('will materialize without concurrent potentials', t => {
+  const toPlace = potentialFactory({ min: 0, target: 1 }, [{ end: 10, start: 0 }], 0.5);
+  const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, []);
+  const materials = materializePotentiality(toPlace, () => [], pChunks)[0];
+  t.true(materials.length === 1);
+  t.true(materials[0].start === 0);
+  t.true(materials[0].end === 1);
+});
+
 test('will materialize splittable potentiality', t => {
   const toPlace: IPotentiality = {
     ...potentialFactory({ min: 1, target: 9 }, [{ end: 10, start: 0 }], 0.6),
@@ -124,7 +133,7 @@ test('materialize will throw if no place available', t => {
       updatePotentialsPressure('substract').bind(null, []),
       pChunks
     ),
-    'No chunks available'
+    'No chunk available.'
   );
   const pChunks2 = computePressureChunks({ startDate: 42, endDate: 52 }, []);
   t.throws(
@@ -134,7 +143,7 @@ test('materialize will throw if no place available', t => {
       updatePotentialsPressure('substract').bind(null, []),
       pChunks2
     ),
-    'No chunks available'
+    'No chunk available.'
   );
 });
 
