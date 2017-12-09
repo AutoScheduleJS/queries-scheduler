@@ -133,7 +133,7 @@ test('materialize will throw if no place available', t => {
       updatePotentialsPressure('substract').bind(null, []),
       pChunks
     ),
-    'No chunks available'
+    'No chunk available.'
   );
   const pChunks2 = computePressureChunks({ startDate: 42, endDate: 52 }, []);
   t.throws(
@@ -143,7 +143,7 @@ test('materialize will throw if no place available', t => {
       updatePotentialsPressure('substract').bind(null, []),
       pChunks2
     ),
-    'No chunks available'
+    'No chunk available.'
   );
 });
 

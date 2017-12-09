@@ -121,6 +121,9 @@ export const materializePotentiality = (
 ): [IMaterial[], IPotentiality[]] => {
   const minMaterials = simulatePlacement(potToSimul('min', toPlace), pressure);
   const maxMaterials = simulatePlacement(potToSimul('target', toPlace), pressure);
+  if (!minMaterials.length && !maxMaterials.length) {
+    throw new Error('No chunk available.');
+  }
   const minPots = updatePP(minMaterials);
   const maxPots = updatePP(maxMaterials);
   const minAvg = potentialsToMeanPressure(minPots);
