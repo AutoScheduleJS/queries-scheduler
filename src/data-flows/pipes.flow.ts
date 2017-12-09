@@ -147,6 +147,18 @@ const getProportionalPressure = (
   return (newPress1 + newPress2) / 2;
 };
 
+const firstTimeRange = (ranges: IRange[]): number => ranges[0].start;
+const lastTimeRange = (ranges: IRange[]): number => ranges[ranges.length - 1].end;
+const scanPressure = (acc: IPressureChunk, curr: IPressureChunk) => ({
+  ...acc,
+  pressure: getProportionalPressure(
+    acc.end - acc.start,
+    acc.pressure,
+    curr.end - curr.start,
+    curr.pressure
+  ),
+});
+
 const computeContiguousPressureChunk = (
   duration: number,
   chunks: IPressureChunk[]
@@ -154,30 +166,19 @@ const computeContiguousPressureChunk = (
   if (!chunks.length) {
     return [];
   }
-  const firstTime = chunks[0].start;
-  const lastTime = chunks[chunks.length - 1].end;
   return R.unnest(
     chunks.map(c => [
       { start: c.start, end: c.start + duration },
       { end: c.end, start: c.end - duration },
     ])
   )
-    .filter(c => c.start >= firstTime && c.end <= lastTime)
+    .filter(c => c.start >= firstTimeRange(chunks) && c.end <= lastTimeRange(chunks))
     .map(c => {
-      // [start, end] & chunks[] --> chunks cut to start end, conserving their data
       const inter = intersect(c, chunks);
       if (!inter.length) {
         return null;
       }
-      return intersect(c, chunks).reduce((acc, curr) => ({
-        ...acc,
-        pressure: getProportionalPressure(
-          acc.end - acc.start,
-          acc.pressure,
-          curr.end - curr.start,
-          curr.pressure
-        ),
-      }));
+      return intersect(c, chunks).reduce(scanPressure);
     })
     .filter(p => p != null) as IPressureChunk[];
 };
