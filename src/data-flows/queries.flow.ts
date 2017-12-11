@@ -129,6 +129,7 @@ const goalToTimeloop = R.ifElse(
 );
 
 const goalToSubpipes = (config: IConfig, query: IQuery): IRange[] => {
+  debugger;
   const start = config.startDate;
   const timeloop = goalToTimeloop(query);
   const maxDuration = config.endDate - config.startDate;

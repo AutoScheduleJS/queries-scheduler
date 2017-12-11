@@ -79,6 +79,7 @@ export const updatePotentialsPressure = (method: 'substract' | 'intersect') => (
   potentialities: IPotentiality[],
   masks: IRange[]
 ): IPotentiality[] => {
+  debugger;
   return potentialities.map(
     R.pipe(
       (p: IPotentiality) => ({
@@ -119,6 +120,7 @@ export const materializePotentiality = (
   updatePP: (m: IMaterial[]) => IPotentiality[],
   pressure: IPressureChunk[]
 ): [IMaterial[], IPotentiality[]] => {
+  debugger;
   const minMaterials = simulatePlacement(potToSimul('min', toPlace), pressure);
   const maxMaterials = simulatePlacement(potToSimul('target', toPlace), pressure);
   if (!minMaterials.length && !maxMaterials.length) {

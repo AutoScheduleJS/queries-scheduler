@@ -172,6 +172,7 @@ test('will convert atomic to potentiality (start, end)', t => {
   t.true(pot[0].places[0].start === 5);
   t.true(pot[0].places[0].end === 6);
   t.true(pot[0].duration.target === 1);
+  t.true(pot[0].duration.min === 1);
 });
 
 test('will convert goal to potentiality', t => {

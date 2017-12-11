@@ -32,6 +32,7 @@ const getMax = <T>(prop: keyof T, list: T[]): T =>
 
 const queriesToPipeline = (config: IConfig, queries: IQuery[]): IMaterial[] => {
   const potentials = queriesToPotentialities(config, queries);
+  debugger;
   return sortByStart(
     R.unnest(R.unfold(R.partial(pipelineUnfolder, [config]), potentials))
   ) as IMaterial[];
@@ -55,6 +56,7 @@ const pipelineUnfolder = (
   if (potentials.length < 1) {
     return false;
   }
+  debugger;
   const toPlace = getMax('pressure', potentials);
   const newPotentials = R.without([toPlace], potentials);
   return materializePotentiality(
