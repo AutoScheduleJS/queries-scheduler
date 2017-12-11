@@ -6,7 +6,6 @@
     ],
     "jsRules": {},
     "rules": {
-      "no-debugger": false,
       "no-implicit-dependencies": [true, "dev"],
       "no-submodule-imports": [true, "rxjs"]
     },

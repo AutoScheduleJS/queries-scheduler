@@ -21,8 +21,8 @@ const potentialFactory = (
 ): IPotentiality => {
   return {
     duration: { ...dur },
+    id: 42,
     isSplittable: false,
-    name: 'potential',
     places: [...places],
     pressure: pressure || 0,
   };
@@ -94,6 +94,15 @@ test('will materialize atomic potentiality', t => {
   const materials = materializePotentiality(toPlace, () => pots, pChunks)[0];
   t.true(materials.length === 1);
   t.true(materials[0].start === 5 && materials[0].end === 6);
+});
+
+test('will materialize atomic within big chunk', t => {
+  const toPlace = potentialFactory({ min: 1, target: 1 }, [{ end: 7, start: 4 }], 1);
+  const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, []);
+  const materials = materializePotentiality(toPlace, () => [], pChunks)[0];
+  t.true(materials.length === 1);
+  t.true(materials[0].start === 4);
+  t.true(materials[0].end === 5);
 });
 
 test('will materialize without concurrent potentials', t => {
