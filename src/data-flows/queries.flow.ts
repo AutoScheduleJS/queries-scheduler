@@ -129,7 +129,6 @@ const goalToTimeloop = R.ifElse(
 );
 
 const goalToSubpipes = (config: IConfig, query: IQuery): IRange[] => {
-  debugger;
   const start = config.startDate;
   const timeloop = goalToTimeloop(query);
   const maxDuration = config.endDate - config.startDate;
@@ -143,10 +142,10 @@ const goalToSubpipes = (config: IConfig, query: IQuery): IRange[] => {
 export const goalToPotentiality = (config: IConfig) => (query: IQuery): IPotentiality[] => {
   const duration = goalToDuration(query);
   const subpipes = goalToSubpipes(config, query);
-  return subpipes.map((mask, i) => ({
+  return subpipes.map(mask => ({
     duration,
+    id: query.id,
     isSplittable: queryIsSplittable(query),
-    name: `${query.name}-goal-${i}`,
     places: [mask],
     pressure: -1,
   }));
@@ -172,6 +171,6 @@ const atomicToChildren = (c: IConfig) =>
 export const atomicToPotentiality = (config: IConfig) => (query: IQuery): IPotentiality[] => {
   const duration = atomicToDuration(query) as ITimeDuration;
   const places = [atomicToChildren(config)(query)];
-  const name = `${query.name}-atomic`;
-  return [{ isSplittable: queryIsSplittable(query), places, duration, name, pressure: -1 }];
+  const id = query.id;
+  return [{ isSplittable: queryIsSplittable(query), places, duration, id, pressure: -1 }];
 };

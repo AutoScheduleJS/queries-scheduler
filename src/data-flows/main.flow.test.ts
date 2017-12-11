@@ -4,10 +4,17 @@ import * as moment from 'moment';
 import { schedule } from './main.flow';
 
 import { IConfig } from '../data-structures/config.interface';
+import { IMaterial } from '../data-structures/material.interface';
 import { GoalKind, QueryKind } from '../data-structures/query.enum';
 import { IQuery } from '../data-structures/query.interface';
 
 const dur = moment.duration;
+
+const validateSE = (t: any, material: IMaterial, range: [number, number], id: number): void => {
+  t.true(material.start === range[0]);
+  t.true(material.end === range[1]);
+  t.true(material.id === id);
+};
 
 test('will schedule nothing when no queries', async t => {
   const config: IConfig = { endDate: +moment().add(7, 'days'), startDate: Date.now() };
@@ -56,11 +63,11 @@ test('will schedule one atomic goal query', async t => {
   });
 });
 
-test.only('will schedule one splittable goal with one atomic', async t => {
+test('will schedule one splittable goal with one atomic', async t => {
   const now = moment();
   const config: IConfig = { endDate: +moment(now).add(5, 'hours'), startDate: +now };
-  const atomicStart = +moment().add(1, 'hour');
-  const atomicEnd = +moment().add(3, 'hour');
+  const atomicStart = +moment(now).add(1, 'hour');
+  const atomicEnd = +moment(now).add(3, 'hour');
   const queries: IQuery[] = [
     {
       end: { max: atomicEnd, min: atomicEnd, target: atomicEnd },
@@ -72,7 +79,7 @@ test.only('will schedule one splittable goal with one atomic', async t => {
     {
       goal: {
         kind: GoalKind.Splittable,
-        quantity: { min: +dur(2.5, 'hours'), target: +dur(2.5, 'hours') },
+        quantity: { min: +dur(3, 'hours'), target: +dur(3, 'hours') },
         time: +dur(5, 'hours'),
       },
       id: 2,
@@ -81,5 +88,9 @@ test.only('will schedule one splittable goal with one atomic', async t => {
     },
   ];
   const result = await schedule(config, queries);
-  t.true(result.length);
+
+  t.true(result.length === 3);
+  validateSE(t, result[0], [+now, atomicStart], 2);
+  validateSE(t, result[1], [atomicStart, atomicEnd], 1);
+  validateSE(t, result[2], [atomicEnd, config.endDate], 2);
 });

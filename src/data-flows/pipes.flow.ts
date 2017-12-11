@@ -79,7 +79,6 @@ export const updatePotentialsPressure = (method: 'substract' | 'intersect') => (
   potentialities: IPotentiality[],
   masks: IRange[]
 ): IPotentiality[] => {
-  debugger;
   return potentialities.map(
     R.pipe(
       (p: IPotentiality) => ({
@@ -120,7 +119,6 @@ export const materializePotentiality = (
   updatePP: (m: IMaterial[]) => IPotentiality[],
   pressure: IPressureChunk[]
 ): [IMaterial[], IPotentiality[]] => {
-  debugger;
   const minMaterials = simulatePlacement(potToSimul('min', toPlace), pressure);
   const maxMaterials = simulatePlacement(potToSimul('target', toPlace), pressure);
   if (!minMaterials.length && !maxMaterials.length) {
@@ -148,7 +146,9 @@ const getProportionalPressure = (
   const newPress2 = press2 * dur2 / total;
   return (newPress1 + newPress2) / 2;
 };
-
+const rangeToDuration = (range: IRange): number => {
+  return range.end - range.start;
+};
 const firstTimeRange = (ranges: IRange[]): number => ranges[0].start;
 const lastTimeRange = (ranges: IRange[]): number => ranges[ranges.length - 1].end;
 const scanPressure = (acc: IPressureChunk, curr: IPressureChunk) => ({
@@ -161,6 +161,21 @@ const scanPressure = (acc: IPressureChunk, curr: IPressureChunk) => ({
   ),
 });
 
+const divideChunkByDuration = (duration: number) => (chunk: IPressureChunk): IRange[] => {
+  return [
+    { start: chunk.start, end: chunk.start + duration },
+    { end: chunk.end, start: chunk.end - duration },
+  ];
+};
+
+const rangeChunkIntersectin = (chunks: IPressureChunk[]) => (range: IRange) => {
+  const inter = intersect(range, chunks);
+  if (!inter.length) {
+    return null;
+  }
+  return inter.reduce(scanPressure);
+};
+
 const computeContiguousPressureChunk = (
   duration: number,
   chunks: IPressureChunk[]
@@ -168,61 +183,94 @@ const computeContiguousPressureChunk = (
   if (!chunks.length) {
     return [];
   }
-  return R.unnest(
-    chunks.map(c => [
-      { start: c.start, end: c.start + duration },
-      { end: c.end, start: c.end - duration },
-    ])
-  )
+  return R.unnest(chunks.map(divideChunkByDuration(duration)))
     .filter(c => c.start >= firstTimeRange(chunks) && c.end <= lastTimeRange(chunks))
-    .map(c => {
-      const inter = intersect(c, chunks);
-      if (!inter.length) {
-        return null;
-      }
-      return intersect(c, chunks).reduce(scanPressure);
-    })
+    .map(rangeChunkIntersectin(chunks))
     .filter(p => p != null) as IPressureChunk[];
 };
 
+const findBestContiguousChunk = (
+  toPlace: IPotentialitySimul,
+  chunks: IPressureChunk[]
+): IPressureChunk | undefined => {
+  const during = sortByPressure(chunks).find(chunk => toPlace.places.some(isDuring(chunk)));
+  if (during) {
+    return during;
+  }
+  const between = sortByPressure(
+    R.unnest(
+      R.aperture(2, chunks)
+        .filter((_, i) => i % 2 === 0)
+        .filter(chunkPair => chunkPair[0].end < chunkPair[1].start)
+        .filter(chunkPair =>
+          toPlace.places.some(p => isDuring(p, [chunkPair[0].end, chunkPair[1].start]))
+        )
+        .map(chunkPair =>
+          intersect(toPlace.places, {
+            end: chunkPair[1].start,
+            pressure: chunkPair[0].pressure,
+            start: chunkPair[0].end,
+          })
+        )
+    )
+  );
+  return R.head(between);
+};
+
+const rangeToMaterial = (id: number, chunk: IRange): IMaterial => {
+  return {
+    end: chunk.end,
+    id,
+    start: chunk.start,
+  };
+};
+
+const minimizeChunkToDuration = (chunk: IPressureChunk, duration: number): IPressureChunk => ({
+  ...chunk,
+  end: Math.min(chunk.start + duration, chunk.end),
+  start: chunk.start,
+});
+
 const placeAtomic = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]): IMaterial[] => {
-  const sortedChunks = sortByPressure(computeContiguousPressureChunk(toPlace.duration, pressure));
-  if (sortedChunks.length === 0) {
+  if (toPlace.places.length === 1 && rangeToDuration(toPlace.places[0]) === toPlace.duration) {
+    const result = rangeChunkIntersectin(pressure)(toPlace.places[0]);
+    if (result) {
+      return [rangeToMaterial(toPlace.id, result)];
+    }
+  }
+  const chunks = computeContiguousPressureChunk(toPlace.duration, pressure);
+  if (chunks.length === 0) {
     return [];
   }
-  const bestChunk = sortedChunks.find((chunk: IPressureChunk) => {
-    return toPlace.places.some(isDuring(chunk));
-  });
+  const bestChunk = findBestContiguousChunk(toPlace, chunks);
   if (!bestChunk) {
     return [];
   }
+  return [rangeToMaterial(toPlace.id, minimizeChunkToDuration(bestChunk, toPlace.duration))];
+};
+
+const placeSplittableUnfold = (
+  toPlace: IPotentialitySimul,
+  [materializedSpace, chunks]: [number, IPressureChunk[]]
+): false | [IMaterial, [number, IPressureChunk[]]] => {
+  if (materializedSpace >= toPlace.duration || !chunks.length) {
+    return false;
+  }
+  const headChunk = R.head(chunks) as IPressureChunk;
+  const newChunks = R.tail(chunks);
+  const headDuration = rangeToDuration(headChunk);
+  const remainingDuration = toPlace.duration - materializedSpace;
   return [
-    {
-      end: bestChunk.end,
-      id: Date.now(),
-      start: bestChunk.start,
-    },
+    rangeToMaterial(toPlace.id, minimizeChunkToDuration(headChunk, remainingDuration)),
+    [Math.min(materializedSpace + headDuration, toPlace.duration), newChunks],
   ];
 };
 
 const placeSplittable = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]): IMaterial[] => {
-  const sortedChunks = sortByPressure(pressure.filter(isOverlapping(toPlace.places)));
-  let materializedSpace = 0;
-  const result: IMaterial[] = [];
-  while (materializedSpace < toPlace.duration && sortedChunks.length > 0) {
-    const best = { ...(sortedChunks.shift() as IPressureChunk) };
-    if (materializedSpace + best.end - best.start > toPlace.duration) {
-      best.end = best.start + (toPlace.duration - materializedSpace);
-    }
-    const bestDur = best.end - best.start;
-    materializedSpace += bestDur;
-    result.push({
-      end: best.end,
-      id: Date.now(),
-      start: best.start,
-    });
-  }
-  return result;
+  const sortedChunks = sortByPressure(
+    intersect(toPlace.places, pressure.filter(isOverlapping(toPlace.places)))
+  );
+  return R.unfold(R.partial(placeSplittableUnfold, [toPlace]), [0, sortedChunks]);
 };
 
 const simulatePlacement = (
@@ -249,6 +297,7 @@ const potentialsToMeanPressure = R.pipe(
 
 const potToSimul = (durationType: keyof ITimeDuration, pot: IPotentiality): IPotentialitySimul => ({
   duration: pot.duration[durationType],
+  id: pot.id,
   isSplittable: pot.isSplittable,
   places: pot.places,
 });
