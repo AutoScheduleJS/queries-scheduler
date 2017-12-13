@@ -1,10 +1,10 @@
+import { ITimeDuration } from '@autoschedule/queries-fn';
 import test from 'ava';
 import { isEqual } from 'intervals-fn';
 
 import { IConfig } from '../data-structures/config.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
-import { ITimeDuration } from '../data-structures/query.interface';
 import { IRange } from '../data-structures/range.interface';
 
 import {

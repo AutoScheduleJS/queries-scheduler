@@ -1,3 +1,4 @@
+import { ITimeDuration } from '@autoschedule/queries-fn';
 import { intersect, isDuring, isOverlapping, substract } from 'intervals-fn';
 import * as R from 'ramda';
 
@@ -6,7 +7,6 @@ import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality, IPotentialitySimul } from '../data-structures/potentiality.interface';
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
 import { IPressureChunkPoint, IPressurePoint } from '../data-structures/pressure-point.interface';
-import { ITimeDuration } from '../data-structures/query.interface';
 import { IRange } from '../data-structures/range.interface';
 
 const computePressureWithSpace = (p: IPotentiality, space: number): number => {

@@ -1,4 +1,4 @@
-import { ITimeDuration } from './query.interface';
+import { ITimeDuration } from '@autoschedule/queries-fn';
 import { IRange } from './range.interface';
 
 export interface IPotentiality {

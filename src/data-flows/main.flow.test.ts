@@ -1,3 +1,4 @@
+import { GoalKind, IQuery, QueryKind } from '@autoschedule/queries-fn';
 import test from 'ava';
 import * as moment from 'moment';
 
@@ -5,8 +6,6 @@ import { schedule } from './main.flow';
 
 import { IConfig } from '../data-structures/config.interface';
 import { IMaterial } from '../data-structures/material.interface';
-import { GoalKind, QueryKind } from '../data-structures/query.enum';
-import { IQuery } from '../data-structures/query.interface';
 
 const dur = moment.duration;
 

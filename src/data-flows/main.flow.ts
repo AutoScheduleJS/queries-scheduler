@@ -1,3 +1,4 @@
+import { IQuery } from '@autoschedule/queries-fn';
 import * as R from 'ramda';
 
 import {
@@ -17,7 +18,6 @@ import {
 import { IConfig } from '../data-structures/config.interface';
 import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
-import { IQuery } from '../data-structures/query.interface';
 import { IRange } from '../data-structures/range.interface';
 
 export function schedule(config: IConfig, queries: IQuery[]): Promise<IMaterial[]> {

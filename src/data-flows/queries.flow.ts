@@ -1,16 +1,17 @@
+import {
+  GoalKind,
+  IQuery,
+  ITimeBoundary,
+  ITimeDuration,
+  ITimeRestriction,
+  RestrictionCondition,
+} from '@autoschedule/queries-fn';
 import { complement, intersect } from 'intervals-fn';
 import * as moment from 'moment';
 import * as R from 'ramda';
 
 import { IConfig } from '../data-structures/config.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
-import { GoalKind, RestrictionCondition } from '../data-structures/query.enum';
-import {
-  IQuery,
-  ITimeBoundary,
-  ITimeDuration,
-  ITimeRestriction,
-} from '../data-structures/query.interface';
 import { IRange } from '../data-structures/range.interface';
 
 type maskFn = (tm: IRange) => IRange[];
