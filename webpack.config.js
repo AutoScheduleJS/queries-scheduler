@@ -2,12 +2,15 @@ const webpack = require('webpack');
 const path = require('path');
 const nodeEnv = process.env.NODE_ENV || 'development';
 const isProd = nodeEnv === 'production';
+const libname = 'queries-scheduler';
 
 const config = {
 	entry: './src/index.ts',
 	output: {
 		path: path.resolve(__dirname, 'dist'),
 		filename: 'index.bundle.js',
+		library: libname,
+		libraryTarget: 'umd',
 	},
 	resolve: {
 		extensions: ['.js', '.ts', '.json'],
