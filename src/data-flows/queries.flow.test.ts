@@ -103,7 +103,10 @@ test('will map from month timeRestrictions when overlapping range', t => {
 
 test('will convert atomic to potentiality (start, duration)', t => {
   const config: IConfig = { startDate: 0, endDate: 10 };
-  const atomic: Q.IQuery = Q.queryFactory(Q.start(5), Q.duration(Q.timeDuration(1)));
+  const atomic: Q.IAtomicQuery = Q.queryFactory<Q.IAtomicQuery>(
+    Q.start(5),
+    Q.duration(Q.timeDuration(1))
+  );
   const pot = atomicToPotentiality(config)(atomic);
 
   t.true(pot.length === 1);
@@ -116,7 +119,7 @@ test('will convert atomic to potentiality (start, duration)', t => {
 
 test('will convert atomic to potentiality (start, end)', t => {
   const config: IConfig = { startDate: 0, endDate: 10 };
-  const atomic: Q.IQuery = Q.queryFactory(Q.start(5), Q.end(6));
+  const atomic: Q.IAtomicQuery = Q.queryFactory<Q.IAtomicQuery>(Q.start(5), Q.end(6));
   const pot = atomicToPotentiality(config)(atomic);
 
   t.true(pot.length === 1);
@@ -130,8 +133,12 @@ test('will convert atomic to potentiality (start, end)', t => {
 
 test('will convert goal to potentiality', t => {
   const config: IConfig = { startDate: 0, endDate: 10 };
-  const qgoal1: Q.IQuery = Q.queryFactory(Q.goal(Q.GoalKind.Atomic, Q.timeDuration(2), 5));
-  const qgoal2: Q.IQuery = Q.queryFactory(Q.goal(Q.GoalKind.Splittable, Q.timeDuration(2.5), 2.5));
+  const qgoal1: Q.IGoalQuery = Q.queryFactory<Q.IGoalQuery>(
+    Q.goal(Q.GoalKind.Atomic, Q.timeDuration(2), 5)
+  );
+  const qgoal2: Q.IGoalQuery = Q.queryFactory<Q.IGoalQuery>(
+    Q.goal(Q.GoalKind.Splittable, Q.timeDuration(2.5), 2.5)
+  );
   const pot1 = goalToPotentiality(config)(qgoal1);
   const pot2 = goalToPotentiality(config)(qgoal2);
   const testPoten = (poten: IPotentiality[]) => {
