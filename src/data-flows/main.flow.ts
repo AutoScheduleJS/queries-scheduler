@@ -1,3 +1,10 @@
+import {
+  IGoalQuery,
+  IProviderQuery,
+  IQuery,
+  isGoalQuery,
+  isProviderQuery,
+} from '@autoschedule/queries-fn';
 import * as R from 'ramda';
 
 import {
@@ -17,7 +24,6 @@ import {
 import { IConfig } from '../data-structures/config.interface';
 import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
-import { IQuery } from '../data-structures/query.interface';
 import { IRange } from '../data-structures/range.interface';
 
 export function schedule(config: IConfig, queries: IQuery[]): Promise<IMaterial[]> {
@@ -41,11 +47,18 @@ const queriesToPotentialities = (config: IConfig, queries: IQuery[]): IPotential
   return R.unnest(
     queries.map(
       R.converge(updatePotentialsPressure('intersect'), [
-        R.ifElse(R.has('goal'), goalToPotentiality(config), atomicToPotentiality(config)),
+        queryToPotentiality(config),
         queryToMask(config),
       ])
     )
   );
+};
+
+const queryToPotentiality = (config: IConfig) => (query: IQuery) => {
+  if (isGoalQuery(query)) {
+    return goalToPotentiality(config)(query);
+  }
+  return atomicToPotentiality(config)(query);
 };
 
 const pipelineUnfolder = (
@@ -65,6 +78,13 @@ const pipelineUnfolder = (
 };
 
 const queryToMask = R.curry((config: IConfig, query: IQuery): IRange[] => {
+  if (isGoalQuery(query) || isProviderQuery(query)) {
+    return timeRestToMask(config, query);
+  }
+  return [{ start: config.startDate, end: config.endDate }];
+});
+
+const timeRestToMask = (config: IConfig, query: IGoalQuery | IProviderQuery): IRange[] => {
   const timeRestrictions = query.timeRestrictions || {};
   const maskPipeline = R.pipe(
     mapToTimeRestriction(timeRestrictions.month, mapToMonthRange),
@@ -72,4 +92,4 @@ const queryToMask = R.curry((config: IConfig, query: IQuery): IRange[] => {
     mapToTimeRestriction(timeRestrictions.hour, mapToHourRange)
   );
   return maskPipeline([{ start: config.startDate, end: config.endDate }]);
-});
+};

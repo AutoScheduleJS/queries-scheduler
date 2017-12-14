@@ -1,16 +1,18 @@
+import {
+  GoalKind,
+  IAtomicQuery,
+  IGoalQuery,
+  ITimeBoundary,
+  ITimeDuration,
+  ITimeRestriction,
+  RestrictionCondition,
+} from '@autoschedule/queries-fn';
 import { complement, intersect } from 'intervals-fn';
 import * as moment from 'moment';
 import * as R from 'ramda';
 
 import { IConfig } from '../data-structures/config.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
-import { GoalKind, RestrictionCondition } from '../data-structures/query.enum';
-import {
-  IQuery,
-  ITimeBoundary,
-  ITimeDuration,
-  ITimeRestriction,
-} from '../data-structures/query.interface';
 import { IRange } from '../data-structures/range.interface';
 
 type maskFn = (tm: IRange) => IRange[];
@@ -112,8 +114,7 @@ const getMaskFilterFn = (tr: ITimeRestriction, mapFn: mapRange): maskFn => {
 const ifHasStart = R.ifElse(R.has('start'));
 const ifHasEnd = R.ifElse(R.has('end'));
 const ifHasDuration = R.ifElse(R.has('duration'));
-const queryIsSplittable = (query: IQuery) =>
-  query.goal ? query.goal.kind === GoalKind.Splittable : false;
+const queryIsSplittable = (query: IGoalQuery) => query.goal.kind === GoalKind.Splittable;
 const qStart: toTBToNumber = (t: keyof ITimeBoundary) => R.pathOr(0, ['start', t]);
 const qEnd: toTBToNumber = (t: keyof ITimeBoundary) => R.pathOr(0, ['end', t]);
 const qDuration: toTimeDur = R.pathOr({ min: 0, target: 0 }, ['duration']);
@@ -128,7 +129,7 @@ const goalToTimeloop = R.ifElse(
   R.converge(R.divide, [gtime, gQuantityTarget])
 );
 
-const goalToSubpipes = (config: IConfig, query: IQuery): IRange[] => {
+const goalToSubpipes = (config: IConfig, query: IGoalQuery): IRange[] => {
   const start = config.startDate;
   const timeloop = goalToTimeloop(query);
   const maxDuration = config.endDate - config.startDate;
@@ -139,7 +140,7 @@ const goalToSubpipes = (config: IConfig, query: IQuery): IRange[] => {
   );
 };
 
-export const goalToPotentiality = (config: IConfig) => (query: IQuery): IPotentiality[] => {
+export const goalToPotentiality = (config: IConfig) => (query: IGoalQuery): IPotentiality[] => {
   const duration = goalToDuration(query);
   const subpipes = goalToSubpipes(config, query);
   return subpipes.map(mask => ({
@@ -168,9 +169,9 @@ const atomicToChildren = (c: IConfig) =>
     start: ifHasStart(qStart('target'), R.always(c.startDate)),
   });
 
-export const atomicToPotentiality = (config: IConfig) => (query: IQuery): IPotentiality[] => {
+export const atomicToPotentiality = (config: IConfig) => (query: IAtomicQuery): IPotentiality[] => {
   const duration = atomicToDuration(query) as ITimeDuration;
   const places = [atomicToChildren(config)(query)];
   const id = query.id;
-  return [{ isSplittable: queryIsSplittable(query), places, duration, id, pressure: -1 }];
+  return [{ isSplittable: false, places, duration, id, pressure: -1 }];
 };
