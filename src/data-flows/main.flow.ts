@@ -94,9 +94,6 @@ const pipelineUnfolder = (
     );
     return result;
   } catch (e) {
-    if (!(e instanceof ConflictError)) {
-      throw e;
-    }
     return [[getErrorMaterial(toPlace)], []];
   }
 };
