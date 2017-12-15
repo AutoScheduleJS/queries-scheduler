@@ -11,15 +11,15 @@ import { IMaterial } from '../data-structures/material.interface';
 const dur = moment.duration;
 
 const validateSE = (t: any, material: IMaterial, range: [number, number], id: number): void => {
-  t.true(material.start === range[0]);
-  t.true(material.end === range[1]);
-  t.true(material.id === id);
+  t.is(material.start, range[0]);
+  t.is(material.end, range[1]);
+  t.is(material.id, id);
 };
 
 test('will schedule nothing when no queries', t => {
   const config: IConfig = { endDate: +moment().add(7, 'days'), startDate: Date.now() };
   const result = schedule(config, []);
-  t.true(result.length === 0);
+  t.is(result.length, 0);
 });
 
 test('will schedule one atomic query', t => {
@@ -29,9 +29,9 @@ test('will schedule one atomic query', t => {
     Q.queryFactory(Q.duration(Q.timeDuration(durTarget, +dur(1, 'hours')))),
   ];
   const result = schedule(config, queries);
-  t.true(result.length === 1);
-  t.true(result[0].start === config.startDate);
-  t.true(result[0].end === config.startDate + durTarget);
+  t.is(result.length, 1);
+  t.is(result[0].start, config.startDate);
+  t.is(result[0].end, config.startDate + durTarget);
 });
 
 test('will throw ConflictError when conflict found', t => {
@@ -50,7 +50,7 @@ test('will throw ConflictError when conflict found', t => {
     t.true(e instanceof ConflictError);
     const err = e as ConflictError;
     t.is(err.victim, 1);
-    t.true(err.materials.length === 0);
+    t.is(err.materials.length, 0);
   }
 });
 
@@ -64,10 +64,10 @@ test('will schedule one atomic goal query', t => {
     ),
   ];
   const result = schedule(config, queries);
-  t.true(result.length === 2 * 3);
+  t.is(result.length, 2 * 3);
   result.forEach(material => {
     const matDur = material.end - material.start;
-    t.true(matDur === durTarget);
+    t.is(matDur, durTarget);
   });
 });
 

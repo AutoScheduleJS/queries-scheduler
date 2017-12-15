@@ -20,10 +20,10 @@ test('will map nothing when no timeRestrictions', t => {
   const result1 = mapToTimeRestriction(tr, mapToHourRange)([{ end, start }]);
   const result2 = mapToTimeRestriction(undefined, mapToHourRange)([{ end, start }]);
 
-  t.true(result1.length === 0);
-  t.true(result2.length === 1);
-  t.true(result2[0].start === start);
-  t.true(result2[0].end === end);
+  t.is(result1.length, 0);
+  t.is(result2.length, 1);
+  t.is(result2[0].start, start);
+  t.is(result2[0].end, end);
 });
 
 test('will map from hour timeRestrictions', t => {
@@ -34,15 +34,15 @@ test('will map from hour timeRestrictions', t => {
   const result1 = mapToTimeRestriction(tr1, mapToHourRange)([{ end, start }]);
   const result2 = mapToTimeRestriction(tr2, mapToHourRange)([{ end, start }]);
 
-  t.true(result1.length === 1);
-  t.true(result1[0].start === start + 5 * 3600000);
-  t.true(result1[0].end === start + 13 * 3600000);
+  t.is(result1.length, 1);
+  t.is(result1[0].start, start + 5 * 3600000);
+  t.is(result1[0].end, start + 13 * 3600000);
 
-  t.true(result2.length === 2);
-  t.true(result2[0].start === start);
-  t.true(result2[0].end === start + 5 * 3600000);
-  t.true(result2[1].start === start + 13 * 3600000);
-  t.true(result2[1].end === end);
+  t.is(result2.length, 2);
+  t.is(result2[0].start, start);
+  t.is(result2[0].end, start + 5 * 3600000);
+  t.is(result2[1].start, start + 13 * 3600000);
+  t.is(result2[1].end, end);
 });
 
 test('will map from weekday timeRestrictions when during range', t => {
@@ -51,9 +51,9 @@ test('will map from weekday timeRestrictions when during range', t => {
   const tr1 = Q.timeRestriction(Q.RestrictionCondition.InRange, [[3, 6]]);
   const result1 = mapToTimeRestriction(tr1, mapToWeekdayRange)([{ end, start }]);
 
-  t.true(result1.length === 1);
-  t.true(new Date(result1[0].start).getDay() === 3);
-  t.true(new Date(result1[0].end).getDay() === 6);
+  t.is(result1.length, 1);
+  t.is(new Date(result1[0].start).getDay(), 3);
+  t.is(new Date(result1[0].end).getDay(), 6);
 });
 
 test('will map from weekday timeRestrictions when overlapping range', t => {
@@ -65,12 +65,12 @@ test('will map from weekday timeRestrictions when overlapping range', t => {
   const result1 = mapToTimeRestriction(tr1, mapToWeekdayRange)([{ end: end1, start: start1 }]);
   const result2 = mapToTimeRestriction(tr1, mapToWeekdayRange)([{ end: end2, start: start2 }]);
 
-  t.true(result1.length === 1);
-  t.true(new Date(result1[0].start).getDay() === 4);
-  t.true(new Date(result1[0].end).getDay() === 6);
-  t.true(result2.length === 1);
-  t.true(new Date(result2[0].start).getDay() === 3);
-  t.true(new Date(result2[0].end).getDay() === 5);
+  t.is(result1.length, 1);
+  t.is(new Date(result1[0].start).getDay(), 4);
+  t.is(new Date(result1[0].end).getDay(), 6);
+  t.is(result2.length, 1);
+  t.is(new Date(result2[0].start).getDay(), 3);
+  t.is(new Date(result2[0].end).getDay(), 5);
 });
 
 test('will map from month timeRestrictions when during range', t => {
@@ -79,9 +79,9 @@ test('will map from month timeRestrictions when during range', t => {
   const tr1 = Q.timeRestriction(Q.RestrictionCondition.InRange, [[6, 7]]);
   const result1 = mapToTimeRestriction(tr1, mapToMonthRange)([{ end, start }]);
 
-  t.true(result1.length === 1);
-  t.true(new Date(result1[0].start).getMonth() === 6);
-  t.true(new Date(result1[0].end).getMonth() === 7);
+  t.is(result1.length, 1);
+  t.is(new Date(result1[0].start).getMonth(), 6);
+  t.is(new Date(result1[0].end).getMonth(), 7);
 });
 
 test('will map from month timeRestrictions when overlapping range', t => {
@@ -93,12 +93,12 @@ test('will map from month timeRestrictions when overlapping range', t => {
   const result1 = mapToTimeRestriction(tr1, mapToMonthRange)([{ end: end1, start: start1 }]);
   const result2 = mapToTimeRestriction(tr1, mapToMonthRange)([{ end: end2, start: start2 }]);
 
-  t.true(result1.length === 1);
-  t.true(new Date(result1[0].start).getMonth() === 6);
-  t.true(new Date(result1[0].end).getMonth() === 7);
-  t.true(result1.length === 1);
-  t.true(new Date(result2[0].end).getMonth() === 6);
-  t.true(new Date(result2[0].start).getMonth() === 4);
+  t.is(result1.length, 1);
+  t.is(new Date(result1[0].start).getMonth(), 6);
+  t.is(new Date(result1[0].end).getMonth(), 7);
+  t.is(result1.length, 1);
+  t.is(new Date(result2[0].end).getMonth(), 6);
+  t.is(new Date(result2[0].start).getMonth(), 4);
 });
 
 test('will convert atomic to potentiality (start, duration)', t => {
@@ -109,12 +109,12 @@ test('will convert atomic to potentiality (start, duration)', t => {
   );
   const pot = atomicToPotentiality(config)(atomic);
 
-  t.true(pot.length === 1);
+  t.is(pot.length, 1);
   t.false(pot[0].isSplittable);
-  t.true(pot[0].places.length === 1);
-  t.true(pot[0].places[0].start === 5);
-  t.true(pot[0].places[0].end === 10);
-  t.true(pot[0].duration.target === 1);
+  t.is(pot[0].places.length, 1);
+  t.is(pot[0].places[0].start, 5);
+  t.is(pot[0].places[0].end, 10);
+  t.is(pot[0].duration.target, 1);
 });
 
 test('will convert atomic to potentiality (start, end)', t => {
@@ -122,13 +122,13 @@ test('will convert atomic to potentiality (start, end)', t => {
   const atomic: Q.IAtomicQuery = Q.queryFactory<Q.IAtomicQuery>(Q.start(5), Q.end(6));
   const pot = atomicToPotentiality(config)(atomic);
 
-  t.true(pot.length === 1);
+  t.is(pot.length, 1);
   t.false(pot[0].isSplittable);
-  t.true(pot[0].places.length === 1);
-  t.true(pot[0].places[0].start === 5);
-  t.true(pot[0].places[0].end === 6);
-  t.true(pot[0].duration.target === 1);
-  t.true(pot[0].duration.min === 1);
+  t.is(pot[0].places.length, 1);
+  t.is(pot[0].places[0].start, 5);
+  t.is(pot[0].places[0].end, 6);
+  t.is(pot[0].duration.target, 1);
+  t.is(pot[0].duration.min, 1);
 });
 
 test('will convert goal to potentiality', t => {
@@ -142,13 +142,13 @@ test('will convert goal to potentiality', t => {
   const pot1 = goalToPotentiality(config)(qgoal1);
   const pot2 = goalToPotentiality(config)(qgoal2);
   const testPoten = (poten: IPotentiality[]) => {
-    t.true(poten.length === 4);
-    t.true(poten[0].places.length === 1);
-    t.true(poten[0].places[0].start === 0);
-    t.true(poten[0].places[0].end === 2.5);
-    t.true(poten[1].places.length === 1);
-    t.true(poten[1].places[0].start === 2.5);
-    t.true(poten[1].places[0].end === 5);
+    t.is(poten.length, 4);
+    t.is(poten[0].places.length, 1);
+    t.is(poten[0].places[0].start, 0);
+    t.is(poten[0].places[0].end, 2.5);
+    t.is(poten[1].places.length, 1);
+    t.is(poten[1].places[0].start, 2.5);
+    t.is(poten[1].places[0].end, 5);
   };
   testPoten(pot1);
   testPoten(pot2);
