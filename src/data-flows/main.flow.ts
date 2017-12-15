@@ -22,14 +22,15 @@ import {
 } from '../data-flows/queries.flow';
 
 import { IConfig } from '../data-structures/config.interface';
+import { ConflictError } from '../data-structures/conflict.error';
 import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { IRange } from '../data-structures/range.interface';
 
-export function schedule(config: IConfig, queries: IQuery[]): Promise<IMaterial[]> {
+export function schedule(config: IConfig, queries: IQuery[]): IMaterial[] {
   const pipeline: IMaterial[] = queriesToPipeline(config, queries);
 
-  return Promise.resolve(pipeline);
+  return pipeline;
 }
 
 const sortByStart = R.sortBy<IMaterial>(R.prop('start'));
@@ -38,9 +39,24 @@ const getMax = <T>(prop: keyof T, list: T[]): T =>
 
 const queriesToPipeline = (config: IConfig, queries: IQuery[]): IMaterial[] => {
   const potentials = queriesToPotentialities(config, queries);
-  return sortByStart(
+  const result = sortByStart(
     R.unnest(R.unfold(R.partial(pipelineUnfolder, [config]), potentials))
   ) as IMaterial[];
+  validateTimeline(result);
+  return result;
+};
+
+const validateTimeline = (materials: IMaterial[]): void => {
+  const last = R.last(materials);
+  if (!last) {
+    return;
+  }
+  if (last.end !== -1 || last.start !== -1) {
+    return;
+  }
+  const error = new ConflictError(last.id);
+  error.materials = R.init(materials);
+  throw error;
 };
 
 const queriesToPotentialities = (config: IConfig, queries: IQuery[]): IPotentiality[] => {
@@ -70,12 +86,26 @@ const pipelineUnfolder = (
   }
   const toPlace = getMax('pressure', potentials);
   const newPotentials = R.without([toPlace], potentials);
-  return materializePotentiality(
-    toPlace,
-    R.partial(updatePotentialsPressure('substract'), [newPotentials]),
-    computePressureChunks(config, newPotentials)
-  );
+  try {
+    const result = materializePotentiality(
+      toPlace,
+      R.partial(updatePotentialsPressure('substract'), [newPotentials]),
+      computePressureChunks(config, newPotentials)
+    );
+    return result;
+  } catch (e) {
+    if (!(e instanceof ConflictError)) {
+      throw e;
+    }
+    return [[getErrorMaterial(toPlace)], []];
+  }
 };
+
+const getErrorMaterial = (toPlace: IPotentiality): IMaterial => ({
+  end: -1,
+  id: toPlace.id,
+  start: -1,
+});
 
 const queryToMask = R.curry((config: IConfig, query: IQuery): IRange[] => {
   if (isGoalQuery(query) || isProviderQuery(query)) {

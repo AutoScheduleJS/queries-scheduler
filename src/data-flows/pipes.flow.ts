@@ -3,6 +3,7 @@ import { intersect, isDuring, isOverlapping, substract } from 'intervals-fn';
 import * as R from 'ramda';
 
 import { IConfig } from '../data-structures/config.interface';
+import { ConflictError } from '../data-structures/conflict.error';
 import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality, IPotentialitySimul } from '../data-structures/potentiality.interface';
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
@@ -110,7 +111,7 @@ const findMaxFinitePlacement = (
     durationDelta /= 2;
     testDuration = avgPre > myPre ? testDuration - durationDelta : testDuration + durationDelta;
   } while (Math.abs(avgPre - myPre) >= 0.1);
-  throwIfInvalid(validatePotentials)(pots);
+  throwIfInvalidPots(toPlace)(pots);
   return [materials, pots];
 };
 
@@ -122,14 +123,14 @@ export const materializePotentiality = (
   const minMaterials = simulatePlacement(potToSimul('min', toPlace), pressure);
   const maxMaterials = simulatePlacement(potToSimul('target', toPlace), pressure);
   if (!minMaterials.length && !maxMaterials.length) {
-    throw new Error('No chunk available.');
+    throw new ConflictError(toPlace.id);
   }
   const minPots = updatePP(minMaterials);
   const maxPots = updatePP(maxMaterials);
   const minAvg = potentialsToMeanPressure(minPots);
   const maxAvg = potentialsToMeanPressure(maxPots);
   if (minAvg === maxAvg || (Number.isNaN(minAvg) && Number.isNaN(maxAvg))) {
-    throwIfInvalid(validatePotentials)(minPots);
+    throwIfInvalidPots(toPlace)(minPots);
     return [maxMaterials, maxPots];
   }
   return findMaxFinitePlacement(toPlace, updatePP, pressure);
@@ -284,10 +285,11 @@ const simulatePlacement = (
 };
 
 const validatePotentials = R.none(R.propSatisfies(p => p > 1, 'pressure'));
-const throwIfInvalid = (validator: (d: any) => boolean) =>
-  R.unless(validator, d => {
-    throw new Error(`Invalid ${d}`);
+const throwIfInvalid = (validator: (d: any) => boolean) => (toPlace: IPotentiality) =>
+  R.unless(validator, () => {
+    throw new ConflictError(toPlace.id);
   });
+const throwIfInvalidPots = throwIfInvalid(validatePotentials);
 
 const potentialsToMeanPressure = R.pipe(
   (pots: IPotentiality[]) =>

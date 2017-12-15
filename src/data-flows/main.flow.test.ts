@@ -5,6 +5,7 @@ import * as moment from 'moment';
 import { schedule } from './main.flow';
 
 import { IConfig } from '../data-structures/config.interface';
+import { ConflictError } from '../data-structures/conflict.error';
 import { IMaterial } from '../data-structures/material.interface';
 
 const dur = moment.duration;
@@ -15,25 +16,45 @@ const validateSE = (t: any, material: IMaterial, range: [number, number], id: nu
   t.true(material.id === id);
 };
 
-test('will schedule nothing when no queries', async t => {
+test('will schedule nothing when no queries', t => {
   const config: IConfig = { endDate: +moment().add(7, 'days'), startDate: Date.now() };
-  const result = await schedule(config, []);
+  const result = schedule(config, []);
   t.true(result.length === 0);
 });
 
-test('will schedule one atomic query', async t => {
+test('will schedule one atomic query', t => {
   const config: IConfig = { endDate: +moment().add(1, 'days'), startDate: Date.now() };
   const durTarget = +dur(1.5, 'hours');
   const queries: Q.IQuery[] = [
     Q.queryFactory(Q.duration(Q.timeDuration(durTarget, +dur(1, 'hours')))),
   ];
-  const result = await schedule(config, queries);
+  const result = schedule(config, queries);
   t.true(result.length === 1);
   t.true(result[0].start === config.startDate);
   t.true(result[0].end === config.startDate + durTarget);
 });
 
-test('will schedule one atomic goal query', async t => {
+test('will throw ConflictError when conflict found', t => {
+  const now = moment();
+  const config: IConfig = { endDate: +moment(now).add(5, 'hours'), startDate: +now };
+  const atomicStart = +moment(now).add(1, 'hour');
+  const atomicEnd = +moment(now).add(3, 'hour');
+  const queries: Q.IQuery[] = [
+    Q.queryFactory(Q.id(1), Q.name('atomic 1'), Q.start(atomicStart), Q.end(atomicEnd)),
+    Q.queryFactory(Q.id(2), Q.name('atomic 2'), Q.start(atomicStart), Q.end(atomicEnd + 10)),
+  ];
+  try {
+    schedule(config, queries);
+    t.fail('should throw');
+  } catch (e) {
+    t.true(e instanceof ConflictError);
+    const err = e as ConflictError;
+    t.is(err.victim, 1);
+    t.true(err.materials.length === 0);
+  }
+});
+
+test('will schedule one atomic goal query', t => {
   const config: IConfig = { endDate: +moment().add(3, 'days'), startDate: Date.now() };
   const durTarget = +dur(5, 'minutes');
   const queries: Q.IQuery[] = [
@@ -42,7 +63,7 @@ test('will schedule one atomic goal query', async t => {
       Q.goal(Q.GoalKind.Atomic, Q.timeDuration(2), +dur(1, 'day'))
     ),
   ];
-  const result = await schedule(config, queries);
+  const result = schedule(config, queries);
   t.true(result.length === 2 * 3);
   result.forEach(material => {
     const matDur = material.end - material.start;
@@ -50,7 +71,7 @@ test('will schedule one atomic goal query', async t => {
   });
 });
 
-test('will schedule one splittable goal with one atomic', async t => {
+test('will schedule one splittable goal with one atomic', t => {
   const now = moment();
   const config: IConfig = { endDate: +moment(now).add(5, 'hours'), startDate: +now };
   const atomicStart = +moment(now).add(1, 'hour');
@@ -63,7 +84,7 @@ test('will schedule one splittable goal with one atomic', async t => {
       Q.goal(Q.GoalKind.Splittable, Q.timeDuration(+dur(3, 'hours')), +dur(5, 'hours'))
     ),
   ];
-  const result = await schedule(config, queries);
+  const result = schedule(config, queries);
 
   t.true(result.length === 3);
   validateSE(t, result[0], [+now, atomicStart], 2);

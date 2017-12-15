@@ -3,6 +3,7 @@ import test from 'ava';
 import { isEqual } from 'intervals-fn';
 
 import { IConfig } from '../data-structures/config.interface';
+import { ConflictError } from '../data-structures/conflict.error';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
 import { IRange } from '../data-structures/range.interface';
@@ -142,7 +143,7 @@ test('materialize will throw if no place available', t => {
       updatePotentialsPressure('substract').bind(null, []),
       pChunks
     ),
-    'No chunk available.'
+    ConflictError
   );
   const pChunks2 = computePressureChunks({ startDate: 42, endDate: 52 }, []);
   t.throws(
@@ -152,7 +153,7 @@ test('materialize will throw if no place available', t => {
       updatePotentialsPressure('substract').bind(null, []),
       pChunks2
     ),
-    'No chunk available.'
+    ConflictError
   );
 });
 
