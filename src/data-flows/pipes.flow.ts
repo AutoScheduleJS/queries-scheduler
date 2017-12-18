@@ -5,7 +5,11 @@ import * as R from 'ramda';
 import { IConfig } from '../data-structures/config.interface';
 import { ConflictError } from '../data-structures/conflict.error';
 import { IMaterial } from '../data-structures/material.interface';
-import { IPotentiality, IPotentialitySimul } from '../data-structures/potentiality.interface';
+import {
+  IPotentiality,
+  IPotentialityBase,
+  IPotentialitySimul,
+} from '../data-structures/potentiality.interface';
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
 import { IPressureChunkPoint, IPressurePoint } from '../data-structures/pressure-point.interface';
 import { IRange } from '../data-structures/range.interface';
@@ -218,10 +222,11 @@ const findBestContiguousChunk = (
   return R.head(between);
 };
 
-const rangeToMaterial = (id: number, chunk: IRange): IMaterial => {
+const rangeToMaterial = (toPlace: IPotentialityBase, chunk: IRange): IMaterial => {
   return {
     end: chunk.end,
-    id,
+    materialId: toPlace.potentialId,
+    queryId: toPlace.queryId,
     start: chunk.start,
   };
 };
@@ -236,7 +241,7 @@ const placeAtomic = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]): I
   if (toPlace.places.length === 1 && rangeToDuration(toPlace.places[0]) === toPlace.duration) {
     const result = rangeChunkIntersectin(pressure)(toPlace.places[0]);
     if (result) {
-      return [rangeToMaterial(toPlace.queryId, result)];
+      return [rangeToMaterial(toPlace, result)];
     }
   }
   const chunks = computeContiguousPressureChunk(toPlace.duration, pressure);
@@ -247,7 +252,7 @@ const placeAtomic = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]): I
   if (!bestChunk) {
     return [];
   }
-  return [rangeToMaterial(toPlace.queryId, minimizeChunkToDuration(bestChunk, toPlace.duration))];
+  return [rangeToMaterial(toPlace, minimizeChunkToDuration(bestChunk, toPlace.duration))];
 };
 
 const placeSplittableUnfold = (
@@ -262,7 +267,7 @@ const placeSplittableUnfold = (
   const headDuration = rangeToDuration(headChunk);
   const remainingDuration = toPlace.duration - materializedSpace;
   return [
-    rangeToMaterial(toPlace.queryId, minimizeChunkToDuration(headChunk, remainingDuration)),
+    rangeToMaterial(toPlace, minimizeChunkToDuration(headChunk, remainingDuration)),
     [Math.min(materializedSpace + headDuration, toPlace.duration), newChunks],
   ];
 };

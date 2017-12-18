@@ -13,7 +13,7 @@ const dur = moment.duration;
 const validateSE = (t: any, material: IMaterial, range: [number, number], id: number): void => {
   t.is(material.start, range[0]);
   t.is(material.end, range[1]);
-  t.is(material.id, id);
+  t.is(material.queryId, id);
 };
 
 test('will schedule nothing when no queries', t => {

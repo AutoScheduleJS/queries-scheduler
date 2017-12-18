@@ -1,20 +1,19 @@
 import { ITimeDuration } from '@autoschedule/queries-fn';
 import { IRange } from './range.interface';
 
-export interface IPotentiality {
-  readonly duration: ITimeDuration;
+export interface IPotentialityBase {
   readonly isSplittable: boolean;
   readonly queryId: number;
   readonly potentialId: number;
   readonly places: ReadonlyArray<IRange>;
-  readonly pressure: number;
 }
 
-export interface IPotentialitySimul {
+export interface IPotentiality extends IPotentialityBase {
+  readonly pressure: number;
+  readonly duration: ITimeDuration;
+}
+
+export interface IPotentialitySimul extends IPotentialityBase {
   readonly duration: number;
-  readonly isSplittable: boolean;
-  readonly queryId: number;
-  readonly potentialId: number;
-  readonly places: ReadonlyArray<IRange>;
   readonly [others: string]: any;
 }
