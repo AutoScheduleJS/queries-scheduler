@@ -276,7 +276,8 @@ const placeSplittable = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]
   const sortedChunks = sortByPressure(
     intersect(toPlace.places, pressure.filter(isOverlapping(toPlace.places)))
   );
-  return R.unfold(R.partial(placeSplittableUnfold, [toPlace]), [0, sortedChunks]);
+  return R.unfold(R.partial(placeSplittableUnfold, [toPlace]), [0, sortedChunks])
+    .map((material, i) => ({ ...material, splitId: i }));
 };
 
 const simulatePlacement = (
