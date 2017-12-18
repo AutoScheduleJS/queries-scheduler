@@ -123,7 +123,7 @@ export const materializePotentiality = (
   const minMaterials = simulatePlacement(potToSimul('min', toPlace), pressure);
   const maxMaterials = simulatePlacement(potToSimul('target', toPlace), pressure);
   if (!minMaterials.length && !maxMaterials.length) {
-    throw new ConflictError(toPlace.id);
+    throw new ConflictError(toPlace.queryId);
   }
   const minPots = updatePP(minMaterials);
   const maxPots = updatePP(maxMaterials);
@@ -236,7 +236,7 @@ const placeAtomic = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]): I
   if (toPlace.places.length === 1 && rangeToDuration(toPlace.places[0]) === toPlace.duration) {
     const result = rangeChunkIntersectin(pressure)(toPlace.places[0]);
     if (result) {
-      return [rangeToMaterial(toPlace.id, result)];
+      return [rangeToMaterial(toPlace.queryId, result)];
     }
   }
   const chunks = computeContiguousPressureChunk(toPlace.duration, pressure);
@@ -247,7 +247,7 @@ const placeAtomic = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]): I
   if (!bestChunk) {
     return [];
   }
-  return [rangeToMaterial(toPlace.id, minimizeChunkToDuration(bestChunk, toPlace.duration))];
+  return [rangeToMaterial(toPlace.queryId, minimizeChunkToDuration(bestChunk, toPlace.duration))];
 };
 
 const placeSplittableUnfold = (
@@ -262,7 +262,7 @@ const placeSplittableUnfold = (
   const headDuration = rangeToDuration(headChunk);
   const remainingDuration = toPlace.duration - materializedSpace;
   return [
-    rangeToMaterial(toPlace.id, minimizeChunkToDuration(headChunk, remainingDuration)),
+    rangeToMaterial(toPlace.queryId, minimizeChunkToDuration(headChunk, remainingDuration)),
     [Math.min(materializedSpace + headDuration, toPlace.duration), newChunks],
   ];
 };
@@ -287,7 +287,7 @@ const simulatePlacement = (
 const validatePotentials = R.none(R.propSatisfies(p => p > 1, 'pressure'));
 const throwIfInvalid = (validator: (d: any) => boolean) => (toPlace: IPotentiality) =>
   R.unless(validator, () => {
-    throw new ConflictError(toPlace.id);
+    throw new ConflictError(toPlace.queryId);
   });
 const throwIfInvalidPots = throwIfInvalid(validatePotentials);
 
@@ -299,7 +299,8 @@ const potentialsToMeanPressure = R.pipe(
 
 const potToSimul = (durationType: keyof ITimeDuration, pot: IPotentiality): IPotentialitySimul => ({
   duration: pot.duration[durationType],
-  id: pot.id,
   isSplittable: pot.isSplittable,
   places: pot.places,
+  potentialId: pot.potentialId,
+  queryId: pot.queryId,
 });

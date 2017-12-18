@@ -22,10 +22,11 @@ const potentialFactory = (
 ): IPotentiality => {
   return {
     duration: { ...dur },
-    id: 42,
     isSplittable: false,
     places: [...places],
+    potentialId: 1,
     pressure: pressure || 0,
+    queryId: 42,
   };
 };
 

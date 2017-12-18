@@ -100,7 +100,7 @@ const pipelineUnfolder = (
 
 const getErrorMaterial = (toPlace: IPotentiality): IMaterial => ({
   end: -1,
-  id: toPlace.id,
+  id: toPlace.queryId,
   start: -1,
 });
 

@@ -143,12 +143,13 @@ const goalToSubpipes = (config: IConfig, query: IGoalQuery): IRange[] => {
 export const goalToPotentiality = (config: IConfig) => (query: IGoalQuery): IPotentiality[] => {
   const duration = goalToDuration(query);
   const subpipes = goalToSubpipes(config, query);
-  return subpipes.map(mask => ({
+  return subpipes.map((mask, i) => ({
     duration,
-    id: query.id,
     isSplittable: queryIsSplittable(query),
     places: [mask],
+    potentialId: i,
     pressure: -1,
+    queryId: query.id,
   }));
 };
 
@@ -172,6 +173,6 @@ const atomicToChildren = (c: IConfig) =>
 export const atomicToPotentiality = (config: IConfig) => (query: IAtomicQuery): IPotentiality[] => {
   const duration = atomicToDuration(query) as ITimeDuration;
   const places = [atomicToChildren(config)(query)];
-  const id = query.id;
-  return [{ isSplittable: false, places, duration, id, pressure: -1 }];
+  const queryId = query.id;
+  return [{ isSplittable: false, places, duration, queryId, pressure: -1, potentialId: 0 }];
 };
