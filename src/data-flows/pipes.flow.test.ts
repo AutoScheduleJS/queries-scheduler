@@ -12,7 +12,8 @@ import {
   computePressure,
   computePressureChunks,
   materializePotentiality,
-  updatePotentialsPressure,
+  updatePotentialsPressureFromMats,
+  updatePotentialsPressureFromPots,
 } from './pipes.flow';
 
 const potentialFactory = (
@@ -82,7 +83,7 @@ test('will simplify pressure chunks', t => {
 
 test('will update potentials pressure', t => {
   const pots = [potentialFactory({ min: 2, target: 2 }, [{ end: 2, start: 0 }], 1)];
-  const updated = updatePotentialsPressure('substract')(pots, [{ end: 1, start: 0 }]);
+  const updated = updatePotentialsPressureFromPots(pots, [{ end: 1, start: 0 }]);
   t.is(updated.length, 1);
   t.is(updated[0].pressure, 2);
 });
@@ -126,7 +127,7 @@ test('will materialize splittable potentiality', t => {
   const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, pots);
   const materials = materializePotentiality(
     toPlace,
-    updatePotentialsPressure('substract').bind(null, pots),
+    updatePotentialsPressureFromMats.bind(null, pots),
     pChunks
   )[0];
   t.is(materials.length, 2);
@@ -142,7 +143,7 @@ test('materialize will throw if no place available', t => {
     materializePotentiality.bind(
       null,
       toPlace,
-      updatePotentialsPressure('substract').bind(null, []),
+      updatePotentialsPressureFromMats.bind(null, []),
       pChunks
     ),
     ConflictError
@@ -152,7 +153,7 @@ test('materialize will throw if no place available', t => {
     materializePotentiality.bind(
       null,
       toPlace,
-      updatePotentialsPressure('substract').bind(null, []),
+      updatePotentialsPressureFromMats.bind(null, []),
       pChunks2
     ),
     ConflictError
@@ -170,7 +171,7 @@ test('materialize will throw if not placable without conflict', t => {
     materializePotentiality.bind(
       null,
       toPlace,
-      updatePotentialsPressure('substract').bind(null, pots),
+      updatePotentialsPressureFromMats.bind(null, pots),
       pChunks
     )
   );

@@ -10,7 +10,8 @@ import * as R from 'ramda';
 import {
   computePressureChunks,
   materializePotentiality,
-  updatePotentialsPressure,
+  updatePotentialsPressureFromMats,
+  updatePotentialsPressureFromPots,
 } from '../data-flows/pipes.flow';
 import {
   atomicToPotentiality,
@@ -23,6 +24,7 @@ import {
 
 import { IConfig } from '../data-structures/config.interface';
 import { ConflictError } from '../data-structures/conflict.error';
+import { IPotDependency } from '../data-structures/dependency.interface';
 import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { IRange } from '../data-structures/range.interface';
@@ -49,7 +51,7 @@ const queriesToPipeline = (config: IConfig, queries: IQuery[]): IMaterial[] => {
 
 const queriesToDependencies = (query: IQuery, _: number, queries: IQuery[]) => {
   if (isProviderQuery(query)) {
-    const client = queries.find(q => q.id === query.provide);
+    const client = queries.find(q => q.id === query.provide.queryId);
     return { query, dependsOn: client ? [client.id] : [] };
   }
   return { query, dependsOn: [] };
@@ -72,23 +74,33 @@ const queriesToPotentialities = (
   config: IConfig,
   dependencies: Array<{ query: IQuery; dependsOn: number[] }>
 ): IPotentiality[] => {
-  const result: IPotentiality[][] = [];
+  const result: IPotentiality[] = [];
   const deps = [...dependencies];
   while (deps.length > 0) {
-    const queryI = deps.findIndex(ds => ds.dependsOn.every(d => result.some(qs => qs[0].queryId === d)));
-    if (queryI === -1) { break; }
-    const query = deps[queryI];
+    const queryI = deps.findIndex(ds => ds.dependsOn.every(d => result.some(q => q.queryId === d)));
+    if (queryI === -1) {
+      break;
+    }
+    const query = deps[queryI].query;
     deps.splice(queryI, 1);
-    result.push(queryToPotentialities(config)(query.query));
+    result.push(...queryToPotentialities(config, potsToDependencies(result))(query));
   }
-  return R.unnest(result);
+  return result;
 };
 
-const queryToPotentiality = (config: IConfig) => (query: IQuery) => {
+const potsToDependencies = (pots: IPotentiality[]): IPotDependency[] => {
+  return pots.map(pot => ({
+    places: pot.places,
+    potentialId: pot.potentialId,
+    queryId: pot.queryId,
+  }));
+};
+
+const queryToPotentiality = (config: IConfig, pots: IPotDependency[]) => (query: IQuery) => {
   if (isGoalQuery(query)) {
     return goalToPotentiality(config)(query);
   }
-  return atomicToPotentiality(config)(query);
+  return atomicToPotentiality(config, pots)(query);
 };
 
 const pipelineUnfolder = (
@@ -101,11 +113,10 @@ const pipelineUnfolder = (
   const toPlace = getMax('pressure', potentials);
   const newPotentials = R.without([toPlace], potentials);
   try {
-    const result = materializePotentiality(
-      toPlace,
-      R.partial(updatePotentialsPressure('substract'), [newPotentials]),
-      computePressureChunks(config, newPotentials)
-    );
+    const result = materializePotentiality(toPlace, R.partial(
+        updatePotentialsPressureFromMats,
+        [newPotentials]
+      ), computePressureChunks(config, newPotentials));
     return result;
   } catch (e) {
     return [[getErrorMaterial(toPlace)], []];
@@ -126,9 +137,9 @@ const queryToMask = R.curry((config: IConfig, query: IQuery): IRange[] => {
   return [{ start: config.startDate, end: config.endDate }];
 });
 
-const queryToPotentialities = (config: IConfig) =>
-  R.converge(updatePotentialsPressure('intersect'), [
-    queryToPotentiality(config),
+const queryToPotentialities = (config: IConfig, pots: IPotDependency[]) =>
+  R.converge(updatePotentialsPressureFromPots, [
+    queryToPotentiality(config, pots),
     queryToMask(config),
   ]);
 
