@@ -10,3 +10,27 @@
 [![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
 [![Greenkeeper badge](https://badges.greenkeeper.io/AutoScheduleJS/queries-scheduler.svg)](https://greenkeeper.io/)
 [![npm version](https://badge.fury.io/js/%40autoschedule%2Fqueries-scheduler.svg)](https://badge.fury.io/js/%40autoschedule%2Fqueries-scheduler)
+
+workflow:
+queries -> schedule
+
+needs:
+- once material is placed, don't replace it. Causes loops. Temporary query instead.
+
+schedule (tasks (materials)):
+place potentials with most pressure.
+invalidate placement when incompatible user state transformation ?
+- tasks (potentials)
+
+tasks (potentials):
+- queries
+- tasks (potentials)
+- tasks (materials)
+- user state (potentials)
+- user state (materials)
+
+user state (material):
+- materials
+
+user state (potential):
+- potentials
