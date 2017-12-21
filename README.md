@@ -17,9 +17,15 @@ queries -> schedule
 needs:
 - once material is placed, don't replace it. Causes loops. Temporary query instead.
 
+operations:
+- place potentials with most pressure.
+- invalidate placement when incompatible user state transformation (throw exception). New provider query is pushed. Can now be placed thanks to user state potential.
+- task potential = intersection of query potential (internal constraints) + query dependencies + user state potential.
+- impossible to place => throw exception
+
+when the stream complete without error, it should be the final timeline.
+
 schedule (tasks (materials)):
-place potentials with most pressure.
-invalidate placement when incompatible user state transformation ?
 - tasks (potentials)
 
 tasks (potentials):
@@ -30,7 +36,21 @@ tasks (potentials):
 - user state (materials)
 
 user state (material):
-- materials
+- tasks (materials) with needs
 
 user state (potential):
-- potentials
+- tasks (potentials) with needs
+
+tasks with needs:
+- tasks (materials)
+- agent service
+
+Stream:
+1. agent queries
+2. user interaction
+3. [1, 2] queries
+4. [3] queries with temp
+5. [4, 5, 6, 7, 8] tasks (potential)
+6. [5] user state (potential)
+7. [5] tasks (material)
+8. [7] user state (material)
