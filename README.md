@@ -19,9 +19,10 @@ needs:
 
 operations:
 - place potentials with most pressure.
-- invalidate placement when incompatible user state transformation (throw exception). New provider query is pushed. Can now be placed thanks to user state potential.
+- When all possible queries are placed and some potentials are left, throw exception. New provider query is pushed. Can now be placed thanks to user state potential.
+- tasks with zero potential have pressure of -1 instead of +Infinity.
 - task potential = intersection of query potential (internal constraints) + query dependencies + user state potential.
-- impossible to place (material time) => throw exception.
+- impossible to place (material time) => throw exception. (conflict)
 
 when the stream complete without error, it should be the final timeline.
 
@@ -57,7 +58,14 @@ Stream:
 7. [5] tasks (material)
 8. [7] user state (material)
 
-Catch errors from [7] => generate new queries at [1].
-Listen for tasks (material) => mutate queries in [3] or validate current stream
+a. Catch errors from [7] => generate new queries at [1].
+b. Listen for tasks (material) => mutate queries in [3] or validate current stream
 
 What is temporary in [3] ? start/end/duration. Needs and info are kept.
+
+Module:
+[1, 2, 3] main app
+[4, 5, 7] queries-scheduler
+[6, 8] userstate-manager
+[a] conflic-resolver
+[b] agent-relay
