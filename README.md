@@ -21,7 +21,7 @@ operations:
 - place potentials with most pressure.
 - invalidate placement when incompatible user state transformation (throw exception). New provider query is pushed. Can now be placed thanks to user state potential.
 - task potential = intersection of query potential (internal constraints) + query dependencies + user state potential.
-- impossible to place => throw exception
+- impossible to place (material time) => throw exception.
 
 when the stream complete without error, it should be the final timeline.
 
@@ -36,9 +36,11 @@ tasks (potentials):
 - user state (materials)
 
 user state (material):
+- initial user state
 - tasks (materials) with needs
 
 user state (potential):
+- initial user state
 - tasks (potentials) with needs
 
 tasks with needs:
@@ -54,3 +56,8 @@ Stream:
 6. [5] user state (potential)
 7. [5] tasks (material)
 8. [7] user state (material)
+
+Catch errors from [7] => generate new queries at [1].
+Listen for tasks (material) => mutate queries in [3] or validate current stream
+
+What is temporary in [3] ? start/end/duration. Needs and info are kept.
