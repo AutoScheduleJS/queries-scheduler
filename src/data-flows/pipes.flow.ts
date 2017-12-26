@@ -96,8 +96,8 @@ export const updatePotentialsPressureFromPots = (
 };
 
 export const updatePotentialsPressureFromMats = (
-  potentialities: IPotentiality[],
-  masks: IMaterial[]
+  potentialities: ReadonlyArray<IPotentiality>,
+  masks: ReadonlyArray<IMaterial>
 ): IPotentiality[] => {
   return potentialities.map(
     R.pipe(

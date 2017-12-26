@@ -107,7 +107,7 @@ test('will convert atomic to potentiality (start, duration)', t => {
     Q.start(5),
     Q.duration(Q.timeDuration(1))
   );
-  const pot = atomicToPotentiality(config, [])(atomic);
+  const pot = atomicToPotentiality(config)(atomic);
 
   t.is(pot.length, 1);
   t.false(pot[0].isSplittable);
@@ -120,7 +120,7 @@ test('will convert atomic to potentiality (start, duration)', t => {
 test('will convert atomic to potentiality (start, end)', t => {
   const config: IConfig = { startDate: 0, endDate: 10 };
   const atomic: Q.IAtomicQuery = Q.queryFactory<Q.IAtomicQuery>(Q.start(5), Q.end(6));
-  const pot = atomicToPotentiality(config, [])(atomic);
+  const pot = atomicToPotentiality(config)(atomic);
 
   t.is(pot.length, 1);
   t.false(pot[0].isSplittable);

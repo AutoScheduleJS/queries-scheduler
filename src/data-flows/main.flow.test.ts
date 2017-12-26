@@ -1,8 +1,10 @@
 import * as Q from '@autoschedule/queries-fn';
 import test from 'ava';
 import * as moment from 'moment';
+import 'rxjs/add/observable/of';
+import { map } from 'rxjs/operators';
 
-import { schedule } from './main.flow';
+import { schedule, schedule$ } from './main.flow';
 
 import { IConfig } from '../data-structures/config.interface';
 import { ConflictError } from '../data-structures/conflict.error';
@@ -17,21 +19,25 @@ const validateSE = (t: any, material: IMaterial, range: [number, number], id: nu
 };
 
 test('will schedule nothing when no queries', t => {
+  t.plan(1);
   const config: IConfig = { endDate: +moment().add(7, 'days'), startDate: Date.now() };
-  const result = schedule(config, []);
-  t.is(result.length, 0);
+  return schedule$(config, []).pipe(map(result2 => t.is(result2.length, 0)));
 });
 
 test('will schedule one atomic query', t => {
+  t.plan(1);
   const config: IConfig = { endDate: +moment().add(1, 'days'), startDate: Date.now() };
   const durTarget = +dur(1.5, 'hours');
   const queries: Q.IQuery[] = [
     Q.queryFactory(Q.duration(Q.timeDuration(durTarget, +dur(1, 'hours')))),
   ];
-  const result = schedule(config, queries);
-  t.is(result.length, 1);
-  t.is(result[0].start, config.startDate);
-  t.is(result[0].end, config.startDate + durTarget);
+  return schedule$(config, queries).pipe(
+    map(result => {
+      t.is(result.length, 1);
+      t.is(result[0].start, config.startDate);
+      t.is(result[0].end, config.startDate + durTarget);
+    })
+  );
 });
 
 test('will throw ConflictError when conflict found', t => {

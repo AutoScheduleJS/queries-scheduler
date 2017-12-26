@@ -1,11 +1,8 @@
 import {
   GoalKind,
   IAtomicQuery,
-  IBaseQuery,
-  IChunkIdentifier,
   IGoalQuery,
   IProviderQuery,
-  isProviderQuery,
   ITimeBoundary,
   ITimeDuration,
   ITimeRestriction,
@@ -16,7 +13,6 @@ import * as moment from 'moment';
 import * as R from 'ramda';
 
 import { IConfig } from '../data-structures/config.interface';
-import { IPotDependency } from '../data-structures/dependency.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { IRange } from '../data-structures/range.interface';
 
@@ -175,39 +171,13 @@ const atomicToChildren = (c: IConfig) =>
     start: ifHasStart(qStart('target'), R.always(c.startDate)),
   });
 
-const providerDepToPlaces = (config: IConfig) => (
-  query: IBaseQuery,
-  pots: IPotDependency[]
-): IRange[] => {
-  if (!isProviderQuery(query) || !query.duration) {
-    return [configToRange(config)];
-  }
-  return R.unnest(
-    pots.filter(identifyChunk(query.provide)).map(pot =>
-      pot.places.map(place => ({
-        end: place.start,
-        start: place.start - (query.duration as ITimeDuration).target,
-      }))
-    )
-  );
-};
-
-const identifyChunk = (ident: IChunkIdentifier) => (dep: IPotDependency): boolean => {
-  const queryTest = dep.queryId === ident.queryId;
-  const materialTest = ident.materialId ? ident.materialId === dep.potentialId : true;
-  return queryTest && materialTest;
-};
-
-const configToRange = (config: IConfig) => ({ end: config.endDate, start: config.startDate });
-
-export const atomicToPotentiality = (config: IConfig, pots: IPotDependency[]) => (
+export const atomicToPotentiality = (config: IConfig) => (
   query: IAtomicQuery | IProviderQuery
 ): IPotentiality[] => {
   const duration = atomicToDuration(query) as ITimeDuration;
-  const places = intersect(
-    [atomicToChildren(config)(query)],
-    providerDepToPlaces(config)(query, pots)
-  );
+  const place = atomicToChildren(config)(query);
   const queryId = query.id;
-  return [{ isSplittable: false, places, duration, queryId, pressure: -1, potentialId: 0 }];
+  return [
+    { isSplittable: false, places: [place], duration, queryId, pressure: -1, potentialId: 0 },
+  ];
 };
