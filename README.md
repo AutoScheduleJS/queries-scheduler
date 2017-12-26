@@ -58,7 +58,7 @@ Stream:
 6. [5] user state (potential)
 7. [5] tasks (material)
 8. [7] user state (material)
-9. [5] needs and fixes or validate
+9. [5] needs and fixes, placeholder fill or validate
 
 a. Catch errors from [7] => generate new queries at [1].
 
