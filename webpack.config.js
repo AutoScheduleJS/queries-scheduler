@@ -1,5 +1,6 @@
 const webpack = require('webpack');
 const path = require('path');
+const rxPaths = require('rxjs/_esm5/path-mapping');
 const nodeEnv = process.env.NODE_ENV || 'development';
 const isProd = nodeEnv === 'production';
 const libname = 'queries-scheduler';
@@ -14,6 +15,7 @@ const config = {
 	},
 	resolve: {
 		extensions: ['.js', '.ts', '.json'],
+		alias: rxPaths(),
 	},
 	devtool: isProd ? 'hidden-source-map' : 'cheap-module-eval-source-map',
 	plugins: [
