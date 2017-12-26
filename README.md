@@ -54,11 +54,9 @@ Stream:
 2. user interaction
 3. [1, 2] queries
 4. [3, 5] queries with temp
-5. [4, 5, 6, 7, 8] tasks (potential)
-6. [5] user state (potential)
+5. [4, 5, 7] tasks (potential) - use user-state function on tasks (potential & material)
 7. [5] tasks (material)
-8. [7] user state (material)
-9. [5] needs and fixes, placeholder fill or validate
+9. [7] needs and fixes, placeholder fill or validate
 
 a. Catch errors from [7] => generate new queries at [1].
 
@@ -66,7 +64,7 @@ Module:
 [1] queries-fn
 [2, 3] main app
 [4, 5, 7] queries-scheduler
-[6, 8] userstate-manager
+userstate-manager
 [a] conflic-resolver
 [b] agent-relay
 
