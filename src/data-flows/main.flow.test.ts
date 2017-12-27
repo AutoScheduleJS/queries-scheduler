@@ -4,7 +4,7 @@ import * as moment from 'moment';
 import 'rxjs/add/observable/of';
 import { map } from 'rxjs/operators';
 
-import { schedule, schedule$ } from './main.flow';
+import { schedule$ } from './main.flow';
 
 import { IConfig } from '../data-structures/config.interface';
 import { ConflictError } from '../data-structures/conflict.error';
@@ -50,7 +50,7 @@ test('will throw ConflictError when conflict found', t => {
     Q.queryFactory(Q.id(2), Q.name('atomic 2'), Q.start(atomicStart), Q.end(atomicEnd + 10)),
   ];
   try {
-    schedule(config, queries);
+    schedule$(config, queries);
     t.fail('should throw');
   } catch (e) {
     t.true(e instanceof ConflictError);
@@ -69,12 +69,16 @@ test('will schedule one atomic goal query', t => {
       Q.goal(Q.GoalKind.Atomic, Q.timeDuration(2), +dur(1, 'day'))
     ),
   ];
-  const result = schedule(config, queries);
-  t.is(result.length, 2 * 3);
-  result.forEach(material => {
-    const matDur = material.end - material.start;
-    t.is(matDur, durTarget);
-  });
+  t.plan(3 * 2 + 1);
+  return schedule$(config, queries).pipe(
+    map(result => {
+      t.is(result.length, 2 * 3);
+      result.forEach(material => {
+        const matDur = material.end - material.start;
+        t.is(matDur, durTarget);
+      });
+    })
+  );
 });
 
 test('will schedule one splittable goal with one atomic', t => {
@@ -90,10 +94,12 @@ test('will schedule one splittable goal with one atomic', t => {
       Q.goal(Q.GoalKind.Splittable, Q.timeDuration(+dur(3, 'hours')), +dur(5, 'hours'))
     ),
   ];
-  const result = schedule(config, queries);
-
-  t.true(result.length === 3);
-  validateSE(t, result[0], [+now, atomicStart], 2);
-  validateSE(t, result[1], [atomicStart, atomicEnd], 1);
-  validateSE(t, result[2], [atomicEnd, config.endDate], 2);
+  return schedule$(config, queries).pipe(
+    map(result => {
+      t.true(result.length === 3);
+      validateSE(t, result[0], [+now, atomicStart], 2);
+      validateSE(t, result[1], [atomicStart, atomicEnd], 1);
+      validateSE(t, result[2], [atomicEnd, config.endDate], 2);
+    })
+  );
 });

@@ -33,12 +33,6 @@ import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { IRange } from '../data-structures/range.interface';
 
-export function schedule(config: IConfig, queries: IQuery[]): IMaterial[] {
-  const pipeline: IMaterial[] = queriesToPipeline(config, queries);
-
-  return pipeline;
-}
-
 export const schedule$ = (
   config: IConfig,
   queries: ReadonlyArray<IQuery>
@@ -182,15 +176,6 @@ const addMaterials = (materials$: BehaviorSubject<ReadonlyArray<IMaterial>>) => 
   materials: ReadonlyArray<IMaterial>
 ): void => {
   materials$.next([...materials$.value, ...materials]);
-};
-
-const queriesToPipeline = (config: IConfig, queries: IQuery[]): IMaterial[] => {
-  const potentials = queriesToPotentialities(config, queries);
-  const result = sortByStart(
-    R.unnest(R.unfold(R.partial(pipelineUnfolder, [config]), potentials))
-  ) as IMaterial[];
-  validateTimeline(result);
-  return result;
 };
 
 const validateTimeline = (materials: IMaterial[]): void => {
