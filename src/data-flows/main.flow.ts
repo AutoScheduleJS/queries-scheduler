@@ -63,7 +63,6 @@ const queriesToPipeline$ = (
   withTemp
     .pipe(distinctUntilChanged(), combineLatest(potentialsOb, materialsOb))
     .subscribe(buildPotentials(config, replacePotentials(potentialsBS)));
-  // TODO: reduce potentials queue when they are placed.
   potentialsBS.subscribe(buildMaterials(config, addMaterials(materialsBS)), noOp);
   return materialsOb.pipe(takeLast(1));
 };
