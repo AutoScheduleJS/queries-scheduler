@@ -144,7 +144,7 @@ const buildPotentials = (
   ]
 ): void => {
   const result = updatePotentialsPressureFromMats(
-    queriesToPotentialities(config, queries).filter(pots =>
+    queriesToPotentialities(config, queries, potentials).filter(pots =>
       materials.every(material => material.materialId !== pots.potentialId)
     ),
     materials
@@ -154,7 +154,8 @@ const buildPotentials = (
 
 const queriesToPotentialities = (
   config: IConfig,
-  queries: ReadonlyArray<IQuery>
+  queries: ReadonlyArray<IQuery>,
+  potentials: ReadonlyArray<IPotentiality>
 ): IPotentiality[] =>
   R.unnest(
     queries.map(
