@@ -22,7 +22,7 @@ operations:
 - When all possible queries are placed and some potentials are left, throw exception. New provider query is pushed. Can now be placed thanks to user state potential.
 - two ways to provide: provider depends on needed task; needed task depends on provider.
 - tasks with zero potential have pressure of -1 instead of +Infinity.
-- task potential = intersection of query potential (internal constraints) + query dependencies + user state potential.
+- task potential = intersection of query potential (internal constraints) + query dependencies + user state potential + materials.
 - impossible to place (material time) => throw exception. (conflict)
 
 when the stream complete without error, it should be the final timeline.
@@ -69,3 +69,4 @@ userstate-manager
 [b] agent-relay
 
 Module a: if provider is impossible to place, either there is no need for it, or there is a conflict. Use user-state to determine.
+userstate-manager: query + (potential/material) with needs + config + base needs => ranges of possibilities
