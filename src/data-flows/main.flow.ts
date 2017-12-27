@@ -65,7 +65,7 @@ const queriesToPipeline$ = (
   const potentialsOb = distinctPotentials$(potentialsWorking, potentialsBS);
   const materialsOb = distinctMaterials$(materialsWorking, materialsBS.pipe(map(sortByStart)));
   const withTemp = tempQueriesBS.pipe(map(tq => [...tq, ...queries]));
-  debugger;
+
   withTemp
     .pipe(distinctUntilChanged(), combineLatest(potentialsOb, materialsOb))
     .subscribe(buildPotentials(config, replacePotentials(potentialsBS)));
@@ -152,7 +152,7 @@ const buildPotentials = (
 ): void => {
   const result = updatePotentialsPressureFromMats(
     queriesToPotentialities(config, queries).filter(pots =>
-      materials.some(material => material.materialId === pots.potentialId)
+      materials.every(material => material.materialId !== pots.potentialId)
     ),
     materials
   );

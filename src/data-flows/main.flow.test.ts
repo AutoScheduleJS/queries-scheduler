@@ -25,7 +25,7 @@ test('will schedule nothing when no queries', t => {
 });
 
 test('will schedule one atomic query', t => {
-  t.plan(1);
+  t.plan(3);
   const config: IConfig = { endDate: +moment().add(1, 'days'), startDate: Date.now() };
   const durTarget = +dur(1.5, 'hours');
   const queries: Q.IQuery[] = [
