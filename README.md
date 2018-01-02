@@ -19,7 +19,7 @@ needs:
 
 operations:
 - place potentials with most pressure.
-- When all possible queries are placed and some potentials are left, throw exception. New provider query is pushed. Can now be placed thanks to user state potential.
+- When all possible queries are placed and some potentials are left, throw exception. New provider query is pushed (send needer id so provider query can have a direct dependency). Can now be placed thanks to user state potential.
 - two ways to provide: provider depends on needed task; needed task depends on provider.
 - tasks with zero potential have pressure of -1 instead of +Infinity.
 - task potential = intersection of query potential (internal constraints) + query dependencies + user state potential + materials.
