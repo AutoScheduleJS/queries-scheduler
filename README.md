@@ -24,6 +24,7 @@ operations:
 - tasks with zero potential have pressure of -1 instead of +Infinity.
 - task potential = intersection of query potential (internal constraints) + query dependencies + user state potential + materials.
 - impossible to place (material time) => throw exception. (conflict)
+- query that occurs x time before/after state: Link to material that update state -> link field, queries-scheduler module.
 
 when the stream complete without error, it should be the final timeline.
 
