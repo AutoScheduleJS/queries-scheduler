@@ -38,14 +38,6 @@ tasks (potentials):
 - user state (potentials)
 - user state (materials)
 
-user state (material):
-- initial user state
-- tasks (materials) with needs
-
-user state (potential):
-- initial user state
-- tasks (potentials) with needs
-
 tasks with needs:
 - tasks (materials)
 - agent service

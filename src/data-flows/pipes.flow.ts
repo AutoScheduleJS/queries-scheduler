@@ -88,7 +88,7 @@ export const updatePotentialsPressureFromPots = (
     R.pipe(
       (p: IPotentiality) => ({
         ...p,
-        places: intersect(p.places, R.unnest(masks)),
+        places: masks.reduce((a, b) => intersect(a, b), p.places),
       }),
       (p: IPotentiality) => ({ ...p, pressure: computePressure(p) })
     )

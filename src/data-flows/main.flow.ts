@@ -5,6 +5,7 @@ import {
   isGoalQuery,
   isProviderQuery,
 } from '@autoschedule/queries-fn';
+import { queryToStatePotentials } from '@autoschedule/userstate-manager';
 import * as R from 'ramda';
 import 'rxjs/add/observable/of';
 import { BehaviorSubject } from 'rxjs/BehaviorSubject';
@@ -46,6 +47,7 @@ const sortByStart = R.sortBy<IMaterial>(R.prop('start'));
 const getMax = <T>(prop: keyof T, list: T[]): T =>
   R.reduce(R.maxBy(R.prop(prop) as (n: any) => number), list[0], list);
 
+
 const queriesToPipeline$ = (
   config: IConfig,
   queries: ReadonlyArray<IQuery>
@@ -60,9 +62,10 @@ const queriesToPipeline$ = (
   const materialsOb = distinctMaterials$(materialsWorking, materialsBS.pipe(map(sortByStart)));
   const withTemp = tempQueriesBS.pipe(map(tq => [...tq, ...queries]));
 
+  const userstateHandler = queryToStatePotentials("{}")(config)([...queries]);
   withTemp
     .pipe(distinctUntilChanged(), combineLatest(potentialsOb, materialsOb))
-    .subscribe(buildPotentials(config, replacePotentials(potentialsBS)));
+    .subscribe(buildPotentials(config, replacePotentials(potentialsBS), userstateHandler));
   potentialsBS.subscribe(buildMaterials(config, addMaterials(materialsBS)), noOp);
   return materialsOb.pipe(takeLast(1));
 };
@@ -133,9 +136,12 @@ const buildMaterials = (
   addMatsFn(result);
 };
 
+type handleUserState = (query: IQuery, potentials: IPotentiality[], materials: IMaterial[]) => IRange[];
+
 const buildPotentials = (
   config: IConfig,
-  replacePotsFn: (pots: ReadonlyArray<IPotentiality>) => void
+  replacePotsFn: (pots: ReadonlyArray<IPotentiality>) => void,
+  userstateHandler: handleUserState,
 ) => (
   [queries, potentials, materials]: [
     ReadonlyArray<IQuery>,
@@ -143,8 +149,9 @@ const buildPotentials = (
     ReadonlyArray<IMaterial>
   ]
 ): void => {
+  const newUserstateHandler = (query: IQuery, pot: IPotentiality[]) => userstateHandler(query, pot, [...materials]);
   const result = updatePotentialsPressureFromMats(
-    queriesToPotentialities(config, queries, potentials).filter(pots =>
+    queriesToPotentialities(config, queries, potentials, newUserstateHandler).filter(pots =>
       materials.every(material => material.materialId !== pots.potentialId)
     ),
     materials
@@ -155,13 +162,15 @@ const buildPotentials = (
 const queriesToPotentialities = (
   config: IConfig,
   queries: ReadonlyArray<IQuery>,
-  potentials: ReadonlyArray<IPotentiality>
+  potentials: ReadonlyArray<IPotentiality>,
+  userstateHandler: any,
 ): IPotentiality[] =>
   R.unnest(
     queries.map(
       R.converge(updatePotentialsPressureFromPots, [
         queryToPotentiality(config),
         queryToMask(config),
+        (q: IQuery) => userstateHandler(q, potentials)
       ])
     )
   );
