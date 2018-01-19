@@ -1,5 +1,6 @@
 import { IQuery } from '@autoschedule/queries-fn';
 import { BehaviorSubject } from 'rxjs/BehaviorSubject';
+import { catchError, map } from 'rxjs/operators';
 
 import { IConfig } from '../data-structures/config.interface';
 
@@ -14,4 +15,9 @@ export const schedule$ = (agentRelay: any, conflictResolver: any, config: IConfi
   queries: ReadonlyArray<IQuery>
 ) => {
   const queries$ = new BehaviorSubject(queries);
+  queries$.pipe(
+    map(queriesToPipeline$(config)),
+    map(agentRelay.askDetailsToAgents),
+    // catchError()
+  )
 };
