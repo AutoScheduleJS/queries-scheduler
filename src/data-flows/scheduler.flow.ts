@@ -7,6 +7,7 @@ import {
 } from '@autoschedule/queries-fn';
 import { queryToStatePotentials } from '@autoschedule/userstate-manager';
 import * as R from 'ramda';
+import 'rxjs/add/observable/combineLatest';
 import 'rxjs/add/observable/of';
 import { BehaviorSubject } from 'rxjs/BehaviorSubject';
 import { Observable } from 'rxjs/Observable';
@@ -40,7 +41,7 @@ const getMax = <T>(prop: keyof T, list: T[]): T =>
 
 export const queriesToPipeline$ = (
   config: IConfig,
-  queries: Observable<ReadonlyArray<IQuery>>
+  queries: ReadonlyArray<IQuery>
 ): Observable<ReadonlyArray<IMaterial>> => {
   const potentialsBS = new BehaviorSubject([] as ReadonlyArray<IPotentiality>);
   const materialsBS = new BehaviorSubject([] as ReadonlyArray<IMaterial>);
@@ -51,9 +52,8 @@ export const queriesToPipeline$ = (
   const materialsOb = distinctMaterials$(materialsWorking, materialsBS.pipe(map(sortByStart)));
 
   const userstateHandler = queryToStatePotentials('{}')(config);
-  queries
-    .pipe(distinctUntilChanged(), combineLatest(potentialsOb, materialsOb))
-    .subscribe(buildPotentials(config, replacePotentials(potentialsBS), userstateHandler));
+  Observable.combineLatest(potentialsOb, materialsOb)
+    .subscribe(buildPotentials(config, replacePotentials(potentialsBS), userstateHandler, queries));
   potentialsBS.subscribe(buildMaterials(config, addMaterials(materialsBS)));
   return materialsOb.pipe(takeLast(1));
 };
@@ -130,10 +130,10 @@ type handleUserState = (
 const buildPotentials = (
   config: IConfig,
   replacePotsFn: (pots: ReadonlyArray<IPotentiality>) => void,
-  userstateHandler: handleUserState
+  userstateHandler: handleUserState,
+  queries: ReadonlyArray<IQuery>,
 ) => (
-  [queries, potentials, materials]: [
-    ReadonlyArray<IQuery>,
+  [potentials, materials]: [
     ReadonlyArray<IPotentiality>,
     ReadonlyArray<IMaterial>
   ]
