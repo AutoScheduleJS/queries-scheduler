@@ -39,8 +39,7 @@ const sortByStart = R.sortBy<IMaterial>(R.prop('start'));
 const getMax = <T>(prop: keyof T, list: T[]): T =>
   R.reduce(R.maxBy(R.prop(prop) as (n: any) => number), list[0], list);
 
-export const queriesToPipeline$ = (
-  config: IConfig,
+export const queriesToPipeline$ = (config: IConfig) => (
   queries: ReadonlyArray<IQuery>
 ): Observable<ReadonlyArray<IMaterial>> => {
   const potentialsBS = new BehaviorSubject([] as ReadonlyArray<IPotentiality>);
@@ -52,8 +51,9 @@ export const queriesToPipeline$ = (
   const materialsOb = distinctMaterials$(materialsWorking, materialsBS.pipe(map(sortByStart)));
 
   const userstateHandler = queryToStatePotentials('{}')(config);
-  Observable.combineLatest(potentialsOb, materialsOb)
-    .subscribe(buildPotentials(config, replacePotentials(potentialsBS), userstateHandler, queries));
+  Observable.combineLatest(potentialsOb, materialsOb).subscribe(
+    buildPotentials(config, replacePotentials(potentialsBS), userstateHandler, queries)
+  );
   potentialsBS.subscribe(buildMaterials(config, addMaterials(materialsBS)));
   return materialsOb.pipe(takeLast(1));
 };
@@ -131,13 +131,8 @@ const buildPotentials = (
   config: IConfig,
   replacePotsFn: (pots: ReadonlyArray<IPotentiality>) => void,
   userstateHandler: handleUserState,
-  queries: ReadonlyArray<IQuery>,
-) => (
-  [potentials, materials]: [
-    ReadonlyArray<IPotentiality>,
-    ReadonlyArray<IMaterial>
-  ]
-): void => {
+  queries: ReadonlyArray<IQuery>
+) => ([potentials, materials]: [ReadonlyArray<IPotentiality>, ReadonlyArray<IMaterial>]): void => {
   const newUserstateHandler = (query: IQuery, pot: IPotentiality[]) =>
     userstateHandler([...queries])(query, pot, [...materials]);
   const result = updatePotentialsPressureFromMats(
