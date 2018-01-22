@@ -1,105 +1,128 @@
 import * as Q from '@autoschedule/queries-fn';
-import test from 'ava';
+import test, { TestContext } from 'ava';
 import * as moment from 'moment';
-import 'rxjs/add/observable/of';
-import { map } from 'rxjs/operators';
+import { Observable } from 'rxjs/Observable';
 
-import { schedule$ } from './main.flow';
+import { map, take } from 'rxjs/operators';
 
 import { IConfig } from '../data-structures/config.interface';
-import { ConflictError } from '../data-structures/conflict.error';
 import { IMaterial } from '../data-structures/material.interface';
+import { getSchedule$ } from './main.flow';
 
+type queriesObj = Array<{ readonly id: number; readonly queries: ReadonlyArray<Q.IQuery> }>;
+
+const askDetails = (fn: (s: ReadonlyArray<IMaterial>) => queriesObj) => (
+  s: ReadonlyArray<IMaterial>
+): queriesObj => {
+  return fn(s);
+};
+const conflictResolver = (fn: (q: ReadonlyArray<Q.IQuery>, e: any) => ReadonlyArray<Q.IQuery>) => (
+  queries: ReadonlyArray<Q.IQuery>,
+  error: any
+): Observable<ReadonlyArray<Q.IQuery>> => {
+  return Observable.of(fn(queries, error));
+};
+const toEmpty = () => [];
 const dur = moment.duration;
+const config: IConfig = { endDate: +moment().add(1, 'days'), startDate: Date.now() };
 
-const validateSE = (t: any, material: IMaterial, range: [number, number], id: number): void => {
-  t.is(material.start, range[0]);
-  t.is(material.end, range[1]);
-  t.is(material.queryId, id);
+const testStartEnd = (t: TestContext, start: number, end: number, m: IMaterial) => {
+  t.is(m.start, start);
+  t.is(m.end, end);
 };
 
-test('will schedule nothing when no queries', t => {
+test('will compute zero queries', t => {
   t.plan(1);
-  const config: IConfig = { endDate: +moment().add(7, 'days'), startDate: Date.now() };
-  return schedule$(config, []).pipe(map(result2 => t.is(result2.length, 0)));
+  return getSchedule$(askDetails(toEmpty), conflictResolver(toEmpty), config)([]).pipe(
+    map(s => t.is(s.length, 0)),
+    take(1)
+  );
 });
 
-test('will schedule one atomic query', t => {
-  t.plan(3);
-  const config: IConfig = { endDate: +moment().add(1, 'days'), startDate: Date.now() };
+test('will compute one query', t => {
   const durTarget = +dur(1.5, 'hours');
   const queries: Q.IQuery[] = [
     Q.queryFactory(Q.duration(Q.timeDuration(durTarget, +dur(1, 'hours')))),
   ];
-  return schedule$(config, queries).pipe(
-    map(result => {
-      t.is(result.length, 1);
-      t.is(result[0].start, config.startDate);
-      t.is(result[0].end, config.startDate + durTarget);
-    })
+  return getSchedule$(
+    askDetails(s => {
+      t.is(s.length, 1);
+      testStartEnd(t, config.startDate, config.startDate + durTarget, s[0]);
+      return [];
+    }),
+    conflictResolver(_ => {
+      t.fail('should not have conflict');
+      return [];
+    }),
+    config
+  )(queries).pipe(
+    map(s => {
+      t.is(s.length, 1);
+      testStartEnd(t, config.startDate, config.startDate + durTarget, s[0]);
+    }),
+    take(1)
   );
 });
 
-test('will throw ConflictError when conflict found', t => {
-  const now = moment();
-  const config: IConfig = { endDate: +moment(now).add(5, 'hours'), startDate: +now };
-  const atomicStart = +moment(now).add(1, 'hour');
-  const atomicEnd = +moment(now).add(3, 'hour');
+test('will catch errors', t => {
   const queries: Q.IQuery[] = [
-    Q.queryFactory(Q.id(1), Q.name('atomic 1'), Q.start(atomicStart), Q.end(atomicEnd)),
-    Q.queryFactory(Q.id(2), Q.name('atomic 2'), Q.start(atomicStart), Q.end(atomicEnd + 10)),
+    Q.queryFactory(Q.id(1), Q.start(config.startDate), Q.end(config.endDate - 1)),
+    Q.queryFactory(Q.id(2), Q.start(config.startDate), Q.end(config.endDate - 1)),
   ];
-  try {
-    schedule$(config, queries);
-    t.fail('should throw');
-  } catch (e) {
-    t.true(e instanceof ConflictError);
-    const err = e as ConflictError;
-    t.is(err.victim, 1);
-    t.is(err.materials.length, 0);
-  }
-});
-
-test('will schedule one atomic goal query', t => {
-  const config: IConfig = { endDate: +moment().add(3, 'days'), startDate: Date.now() };
-  const durTarget = +dur(5, 'minutes');
-  const queries: Q.IQuery[] = [
-    Q.queryFactory(
-      Q.duration(Q.timeDuration(durTarget)),
-      Q.goal(Q.GoalKind.Atomic, Q.timeDuration(2), +dur(1, 'day'))
-    ),
-  ];
-  t.plan(3 * 2 + 1);
-  return schedule$(config, queries).pipe(
-    map(result => {
-      t.is(result.length, 2 * 3);
-      result.forEach(material => {
-        const matDur = material.end - material.start;
-        t.is(matDur, durTarget);
-      });
-    })
+  return getSchedule$(
+    askDetails(s => {
+      t.is(s.length, 2);
+      testStartEnd(t, config.startDate, config.startDate + 1000, s[0]);
+      testStartEnd(t, config.startDate + 1001, config.endDate - 1, s[1]);
+      return [];
+    }),
+    conflictResolver((q, e) => {
+      return [
+        Q.queryFactory(Q.id(1), Q.start(config.startDate), Q.end(config.startDate + 1000)),
+        Q.queryFactory(Q.id(2), Q.start(config.startDate + 1001), Q.end(config.endDate - 1)),
+      ];
+    }),
+    config
+  )(queries).pipe(
+    map(s => {
+      t.is(s.length, 2);
+      testStartEnd(t, config.startDate, config.startDate + 1000, s[0]);
+      testStartEnd(t, config.startDate + 1001, config.endDate - 1, s[1]);
+    }),
+    take(1)
   );
 });
 
-test('will schedule one splittable goal with one atomic', t => {
-  const now = moment();
-  const config: IConfig = { endDate: +moment(now).add(5, 'hours'), startDate: +now };
-  const atomicStart = +moment(now).add(1, 'hour');
-  const atomicEnd = +moment(now).add(3, 'hour');
+test('will change query', t => {
+  const durTarget = +dur(1.5, 'hours');
   const queries: Q.IQuery[] = [
-    Q.queryFactory(Q.id(1), Q.name('atomic 1'), Q.start(atomicStart), Q.end(atomicEnd)),
-    Q.queryFactory(
-      Q.id(2),
-      Q.name('splittable goal 1'),
-      Q.goal(Q.GoalKind.Splittable, Q.timeDuration(+dur(3, 'hours')), +dur(5, 'hours'))
-    ),
+    Q.queryFactory(Q.id(1), Q.duration(Q.timeDuration(durTarget, +dur(1, 'hours')))),
   ];
-  return schedule$(config, queries).pipe(
-    map(result => {
-      t.true(result.length === 3);
-      validateSE(t, result[0], [+now, atomicStart], 2);
-      validateSE(t, result[1], [atomicStart, atomicEnd], 1);
-      validateSE(t, result[2], [atomicEnd, config.endDate], 2);
-    })
+  let iteration = 0;
+  return getSchedule$(
+    askDetails(s => {
+      t.is(s.length, 1);
+      if (iteration > 0) { return []; }
+      testStartEnd(t, config.startDate, config.startDate + durTarget, s[0]);
+      iteration++;
+      return [{
+        id: 1,
+        queries: [
+          Q.queryFactory(Q.id(2), Q.start(config.startDate + 1000), Q.end(config.endDate - 1000)),
+        ]
+      }];
+    }),
+    conflictResolver(_ => {
+      t.fail('should not have conflict');
+      return [];
+    }),
+    config
+  )(queries).pipe(
+    map(s => {
+      t.is(s.length, 1);
+      t.is(s[0].queryId, 2);
+      testStartEnd(t, config.startDate + 1000, config.endDate - 1000, s[0]);
+    }),
+    take(1)
   );
 });
