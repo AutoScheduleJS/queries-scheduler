@@ -1,23 +1,61 @@
 import { IQuery } from '@autoschedule/queries-fn';
+import { unnest } from 'ramda';
 import { BehaviorSubject } from 'rxjs/BehaviorSubject';
-import { catchError, map } from 'rxjs/operators';
+import { Observable } from 'rxjs/Observable';
+import { filter, switchMap } from 'rxjs/operators';
+
+import 'rxjs/add/operator/catch';
 
 import { IConfig } from '../data-structures/config.interface';
+import { IMaterial } from '../data-structures/material.interface';
 
 import { queriesToPipeline$ } from './scheduler.flow';
 
-/**
- * Role: resolve conflict from missing provider.
- * Ask for placeholder and query's content and transforms
- * Update queries with agent feedback.
- */
-export const schedule$ = (agentRelay: any, conflictResolver: any, config: IConfig) => (
-  queries: ReadonlyArray<IQuery>
-) => {
+type askDetailsType = (
+  s: ReadonlyArray<IMaterial>
+) => Array<{ readonly id: number; readonly queries: ReadonlyArray<IQuery> }>;
+type conflictResolverType = (
+  queries: ReadonlyArray<IQuery>,
+  error: any
+) => Observable<ReadonlyArray<IQuery>>;
+
+export const getSchedule$ = (
+  askDetails: askDetailsType,
+  conflictResolver: conflictResolverType,
+  config: IConfig
+) => (queries: ReadonlyArray<IQuery>): Observable<ReadonlyArray<IMaterial>> => {
   const queries$ = new BehaviorSubject(queries);
-  queries$.pipe(
-    map(queriesToPipeline$(config)),
-    map(agentRelay.askDetailsToAgents),
-    // catchError()
-  )
+  return queries$.pipe(
+    switchMap(retryWithProvider$(conflictResolver, queriesToPipeline$(config))),
+    filter(scheduleToDetails(queries$, askDetails))
+  );
+};
+
+type queriesToPipeline = (q: ReadonlyArray<IQuery>) => Observable<ReadonlyArray<IMaterial>>;
+
+const scheduleToDetails = (
+  bs: BehaviorSubject<ReadonlyArray<IQuery>>,
+  askDetails: askDetailsType
+) => (schedule: ReadonlyArray<IMaterial>) => {
+  const res = askDetails(schedule);
+  if (!res.length) {
+    return true;
+  }
+  bs.next(
+    unnest(bs.value.map(query => (res.find(rep => rep.id === query.id) || { queries: [] }).queries))
+  );
+  return false;
+};
+
+const retryWithProvider$ = (
+  conflictResolver: conflictResolverType,
+  toPipeline: queriesToPipeline
+) => (queries: ReadonlyArray<IQuery>): Observable<ReadonlyArray<IMaterial>> => {
+  try {
+    return toPipeline(queries);
+  } catch (error) {
+    return conflictResolver(queries, error).pipe(
+      switchMap(retryWithProvider$(conflictResolver, toPipeline))
+    );
+  }
 };

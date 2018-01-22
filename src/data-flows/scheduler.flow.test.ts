@@ -2,7 +2,6 @@ import * as Q from '@autoschedule/queries-fn';
 import test from 'ava';
 import * as moment from 'moment';
 import 'rxjs/add/observable/of';
-import { Observable } from 'rxjs/Observable';
 import { map } from 'rxjs/operators';
 
 import { queriesToPipeline$ } from './scheduler.flow';
