@@ -1,10 +1,12 @@
 import * as Q from '@autoschedule/queries-fn';
 import test from 'ava';
 import * as moment from 'moment';
+import 'rxjs/add/observable/forkJoin';
 import 'rxjs/add/observable/of';
-import { map } from 'rxjs/operators';
+import { Observable } from 'rxjs/Observable';
+import { map, takeLast } from 'rxjs/operators';
 
-import { queriesToPipeline$ } from './scheduler.flow';
+import { queriesToPipeline$, queriesToPipelineDebug$ } from './scheduler.flow';
 
 import { IConfig } from '../data-structures/config.interface';
 import { ConflictError } from '../data-structures/conflict.error';
@@ -21,9 +23,7 @@ const validateSE = (t: any, material: IMaterial, range: [number, number], id: nu
 test('will schedule nothing when no queries', t => {
   t.plan(1);
   const config: IConfig = { endDate: +moment().add(7, 'days'), startDate: Date.now() };
-  return queriesToPipeline$(config)([]).pipe(
-    map(result2 => t.is(result2.length, 0))
-  );
+  return queriesToPipeline$(config)([]).pipe(map(result2 => t.is(result2.length, 0)));
 });
 
 test('will schedule one atomic query', t => {
@@ -104,6 +104,104 @@ test('will schedule one splittable goal with one atomic', t => {
       validateSE(t, result[0], [+now, atomicStart], 2);
       validateSE(t, result[1], [atomicStart, atomicEnd], 1);
       validateSE(t, result[2], [atomicEnd, config.endDate], 2);
+    })
+  );
+});
+
+test('will emit error from userstate', t => {
+  const config: IConfig = { endDate: +moment().add(3, 'days'), startDate: Date.now() };
+  const durTarget = +dur(5, 'minutes');
+  const queries: Q.IQuery[] = [
+    Q.queryFactory(
+      Q.duration(Q.timeDuration(durTarget)),
+      Q.goal(Q.GoalKind.Atomic, Q.timeDuration(2), +dur(1, 'day')),
+      Q.transforms([Q.need(true)], [], [])
+    ),
+  ];
+  try {
+    queriesToPipeline$(config)(queries).subscribe(
+      e => t.fail('should not pass'),
+      e => t.fail('should fail through exception')
+    );
+  } catch (e) {
+    t.pass('should emit errors');
+  }
+});
+
+test('debug version will emit errors and close stream', t => {
+  const now = moment();
+  const config: IConfig = { endDate: +moment(now).add(5, 'hours'), startDate: +now };
+  const atomicStart = +moment(now).add(1, 'hour');
+  const atomicEnd = +moment(now).add(3, 'hour');
+  const queries: Q.IQuery[] = [
+    Q.queryFactory(Q.id(1), Q.name('atomic 1'), Q.start(atomicStart), Q.end(atomicEnd)),
+    Q.queryFactory(Q.id(2), Q.name('atomic 2'), Q.start(atomicStart), Q.end(atomicEnd + 10)),
+  ];
+  const [errors] = queriesToPipelineDebug$(config, true)(queries);
+  if (errors == null) {
+    return t.fail('errors should not be null');
+  }
+  return errors.pipe(
+    map(e => {
+      t.true(e instanceof ConflictError);
+      const err = e as ConflictError;
+      t.is(err.victim, 1);
+      t.is(err.materials.length, 0);
+    })
+  );
+});
+
+test('debug version will emit error from userstate', t => {
+  const config: IConfig = { endDate: +moment().add(3, 'days'), startDate: Date.now() };
+  const durTarget = +dur(5, 'minutes');
+  const queries: Q.IQuery[] = [
+    Q.queryFactory(
+      Q.duration(Q.timeDuration(durTarget)),
+      Q.goal(Q.GoalKind.Atomic, Q.timeDuration(2), +dur(1, 'day')),
+      Q.transforms([Q.need(true)], [], [])
+    ),
+  ];
+  const [errors, pots, mats] = queriesToPipelineDebug$(config, true)(queries);
+  if (errors == null) {
+    return t.fail('errors should not be null');
+  }
+  return Observable.forkJoin(errors, pots, mats).pipe(
+    takeLast(1),
+    map(([error, pot, mat]) => {
+      if (error) {
+        t.pass('should emit errors');
+      }
+    })
+  );
+});
+
+test('debug version will emit materials and potentials stream', t => {
+  const now = moment();
+  const config: IConfig = { endDate: +moment(now).add(5, 'hours'), startDate: +now };
+  const atomicStart = +moment(now).add(1, 'hour');
+  const atomicEnd = +moment(now).add(3, 'hour');
+  const queries: Q.IQuery[] = [
+    Q.queryFactory(Q.id(1), Q.name('atomic 1'), Q.start(atomicStart), Q.end(atomicEnd)),
+    Q.queryFactory(
+      Q.id(2),
+      Q.name('splittable goal 1'),
+      Q.goal(Q.GoalKind.Splittable, Q.timeDuration(+dur(3, 'hours')), +dur(5, 'hours'))
+    ),
+  ];
+  const [errors, pots, mats] = queriesToPipelineDebug$(config, true)(queries);
+  if (errors == null) {
+    return t.fail('errors should not be null');
+  }
+  return Observable.forkJoin(errors, pots, mats).pipe(
+    takeLast(1),
+    map(([error, pot, mat]) => {
+      if (error) {
+        t.fail('should not emit errors');
+      }
+      t.true(mat.length === 3);
+      validateSE(t, mat[0], [+now, atomicStart], 2);
+      validateSE(t, mat[1], [atomicStart, atomicEnd], 1);
+      validateSE(t, mat[2], [atomicEnd, config.endDate], 2);
     })
   );
 });

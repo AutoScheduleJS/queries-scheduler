@@ -44,11 +44,21 @@ test('will compute one query', t => {
   const queries: Q.IQuery[] = [
     Q.queryFactory(Q.duration(Q.timeDuration(durTarget, +dur(1, 'hours')))),
   ];
+  let i = 0;
   return getSchedule$(
     askDetails(s => {
+      if (i > 0) {
+        return [];
+      }
       t.is(s.length, 1);
+      i++;
       testStartEnd(t, config.startDate, config.startDate + durTarget, s[0]);
-      return [];
+      return [
+        {
+          id: 72,
+          queries: [],
+        },
+      ];
     }),
     conflictResolver(_ => {
       t.fail('should not have conflict');
@@ -57,6 +67,9 @@ test('will compute one query', t => {
     config
   )(queries).pipe(
     map(s => {
+      if (s.length === 0) {
+        return;
+      }
       t.is(s.length, 1);
       testStartEnd(t, config.startDate, config.startDate + durTarget, s[0]);
     }),
@@ -102,15 +115,23 @@ test('will change query', t => {
   return getSchedule$(
     askDetails(s => {
       t.is(s.length, 1);
-      if (iteration > 0) { return []; }
+      if (iteration > 0) {
+        return [];
+      }
       testStartEnd(t, config.startDate, config.startDate + durTarget, s[0]);
       iteration++;
-      return [{
-        id: 1,
-        queries: [
-          Q.queryFactory(Q.id(2), Q.start(config.startDate + 1000), Q.end(config.endDate - 1000)),
-        ]
-      }];
+      return [
+        {
+          id: 1,
+          queries: [
+            Q.queryFactory(Q.id(2), Q.start(config.startDate + 1000), Q.end(config.endDate - 1000)),
+          ],
+        },
+        {
+          id: 2,
+          queries: [],
+        },
+      ];
     }),
     conflictResolver(_ => {
       t.fail('should not have conflict');

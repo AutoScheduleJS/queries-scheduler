@@ -41,9 +41,17 @@ const scheduleToDetails = (
   if (!res.length) {
     return true;
   }
-  bs.next(
-    unnest(bs.value.map(query => (res.find(rep => rep.id === query.id) || { queries: [] }).queries))
-  );
+  const values = bs.value.map((query) => {
+    const queries = res.find(rep => rep.id === query.id);
+    if (!queries) {
+      return [];
+    }
+    return queries.queries;
+  });
+  bs.next(unnest(values));
+  // bs.next(
+  //   unnest(bs.value.map(query => (res.find(rep => rep.id === query.id) || { queries: [] }).queries))
+  // );
   return false;
 };
 
