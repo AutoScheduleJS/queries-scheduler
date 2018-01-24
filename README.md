@@ -28,6 +28,7 @@ operations:
 - query that occurs x time before/after state: Link to material that update state -> link field, queries-scheduler module.
 - Only one exception is permitted: conflict error that needs user. Others are caught (from userstate) with conflict-resolver
 - providers handle is complex. Use priority list. Can cause side-effect conflict. How to go back to the source of conflict ? How to switch from 1st priority to another ? Simulation with satisfaction threshold for all materials ? heavy cost (recursive and exponential, due to provider sub-dependance to other providers).
+- Agents -> queries ; conflict-resolver (error): query -> agent ; manage agents as a stream
 
 when the stream complete without error, it should be the final timeline.
 
