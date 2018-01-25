@@ -1,4 +1,5 @@
 import * as Q from '@autoschedule/queries-fn';
+import { queryToStatePotentials } from '@autoschedule/userstate-manager';
 import test, { TestContext } from 'ava';
 import * as moment from 'moment';
 import { Observable } from 'rxjs/Observable';
@@ -10,6 +11,8 @@ import { IMaterial } from '../data-structures/material.interface';
 import { getSchedule$ } from './main.flow';
 
 type queriesObj = Array<{ readonly id: number; readonly queries: ReadonlyArray<Q.IQuery> }>;
+
+const stateManager = queryToStatePotentials('{}');
 
 const askDetails = (fn: (s: ReadonlyArray<IMaterial>) => queriesObj) => (
   s: ReadonlyArray<IMaterial>
@@ -33,10 +36,9 @@ const testStartEnd = (t: TestContext, start: number, end: number, m: IMaterial) 
 
 test('will compute zero queries', t => {
   t.plan(1);
-  return getSchedule$(askDetails(toEmpty), conflictResolver(toEmpty), config)([]).pipe(
-    map(s => t.is(s.length, 0)),
-    take(1)
-  );
+  return getSchedule$(askDetails(toEmpty), conflictResolver(toEmpty), config)(stateManager)(
+    []
+  ).pipe(map(s => t.is(s.length, 0)), take(1));
 });
 
 test('will compute one query', t => {
@@ -65,7 +67,7 @@ test('will compute one query', t => {
       return [];
     }),
     config
-  )(queries).pipe(
+  )(stateManager)(queries).pipe(
     map(s => {
       if (s.length === 0) {
         return;
@@ -96,7 +98,7 @@ test('will catch errors', t => {
       ];
     }),
     config
-  )(queries).pipe(
+  )(stateManager)(queries).pipe(
     map(s => {
       t.is(s.length, 2);
       testStartEnd(t, config.startDate, config.startDate + 1000, s[0]);
@@ -138,7 +140,7 @@ test('will change query', t => {
       return [];
     }),
     config
-  )(queries).pipe(
+  )(stateManager)(queries).pipe(
     map(s => {
       t.is(s.length, 1);
       t.is(s[0].queryId, 2);

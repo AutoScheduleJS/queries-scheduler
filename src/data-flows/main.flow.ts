@@ -9,7 +9,7 @@ import 'rxjs/add/operator/catch';
 import { IConfig } from '../data-structures/config.interface';
 import { IMaterial } from '../data-structures/material.interface';
 
-import { queriesToPipeline$ } from './scheduler.flow';
+import { queriesToPipeline$, stateManagerType } from './scheduler.flow';
 
 type askDetailsType = (
   s: ReadonlyArray<IMaterial>
@@ -23,10 +23,10 @@ export const getSchedule$ = (
   askDetails: askDetailsType,
   conflictResolver: conflictResolverType,
   config: IConfig
-) => (queries: ReadonlyArray<IQuery>): Observable<ReadonlyArray<IMaterial>> => {
+) => (stateManager: stateManagerType) => (queries: ReadonlyArray<IQuery>): Observable<ReadonlyArray<IMaterial>> => {
   const queries$ = new BehaviorSubject(queries);
   return queries$.pipe(
-    switchMap(retryWithProvider$(conflictResolver, queriesToPipeline$(config))),
+    switchMap(retryWithProvider$(conflictResolver, queriesToPipeline$(config)(stateManager))),
     filter(scheduleToDetails(queries$, askDetails))
   );
 };

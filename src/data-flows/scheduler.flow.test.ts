@@ -1,4 +1,5 @@
 import * as Q from '@autoschedule/queries-fn';
+import { queryToStatePotentials } from '@autoschedule/userstate-manager';
 import test from 'ava';
 import * as moment from 'moment';
 import 'rxjs/add/observable/forkJoin';
@@ -13,6 +14,7 @@ import { ConflictError } from '../data-structures/conflict.error';
 import { IMaterial } from '../data-structures/material.interface';
 
 const dur = moment.duration;
+const stateManager = queryToStatePotentials("{}");
 
 const validateSE = (t: any, material: IMaterial, range: [number, number], id: number): void => {
   t.is(material.start, range[0]);
@@ -23,7 +25,7 @@ const validateSE = (t: any, material: IMaterial, range: [number, number], id: nu
 test('will schedule nothing when no queries', t => {
   t.plan(1);
   const config: IConfig = { endDate: +moment().add(7, 'days'), startDate: Date.now() };
-  return queriesToPipeline$(config)([]).pipe(map(result2 => t.is(result2.length, 0)));
+  return queriesToPipeline$(config)(stateManager)([]).pipe(map(result2 => t.is(result2.length, 0)));
 });
 
 test('will schedule one atomic query', t => {
@@ -33,7 +35,7 @@ test('will schedule one atomic query', t => {
   const queries: Q.IQuery[] = [
     Q.queryFactory(Q.duration(Q.timeDuration(durTarget, +dur(1, 'hours')))),
   ];
-  return queriesToPipeline$(config)(queries).pipe(
+  return queriesToPipeline$(config)(stateManager)(queries).pipe(
     map(result => {
       t.is(result.length, 1);
       t.is(result[0].start, config.startDate);
@@ -52,7 +54,7 @@ test('will throw ConflictError when conflict found', t => {
     Q.queryFactory(Q.id(2), Q.name('atomic 2'), Q.start(atomicStart), Q.end(atomicEnd + 10)),
   ];
   try {
-    queriesToPipeline$(config)(queries).subscribe(
+    queriesToPipeline$(config)(stateManager)(queries).subscribe(
       e => t.fail('should not pass'),
       e => t.fail('should fail through exception')
     );
@@ -74,7 +76,7 @@ test('will schedule one atomic goal query', t => {
     ),
   ];
   t.plan(3 * 2 + 1);
-  return queriesToPipeline$(config)(queries).pipe(
+  return queriesToPipeline$(config)(stateManager)(queries).pipe(
     map(result => {
       t.is(result.length, 2 * 3);
       result.forEach(material => {
@@ -98,7 +100,7 @@ test('will schedule one splittable goal with one atomic', t => {
       Q.goal(Q.GoalKind.Splittable, Q.timeDuration(+dur(3, 'hours')), +dur(5, 'hours'))
     ),
   ];
-  return queriesToPipeline$(config)(queries).pipe(
+  return queriesToPipeline$(config)(stateManager)(queries).pipe(
     map(result => {
       t.true(result.length === 3);
       validateSE(t, result[0], [+now, atomicStart], 2);
@@ -119,7 +121,7 @@ test('will emit error from userstate', t => {
     ),
   ];
   try {
-    queriesToPipeline$(config)(queries).subscribe(
+    queriesToPipeline$(config)(stateManager)(queries).subscribe(
       e => t.fail('should not pass'),
       e => t.fail('should fail through exception')
     );
@@ -137,7 +139,7 @@ test('debug version will emit errors and close stream', t => {
     Q.queryFactory(Q.id(1), Q.name('atomic 1'), Q.start(atomicStart), Q.end(atomicEnd)),
     Q.queryFactory(Q.id(2), Q.name('atomic 2'), Q.start(atomicStart), Q.end(atomicEnd + 10)),
   ];
-  const [errors] = queriesToPipelineDebug$(config, true)(queries);
+  const [errors] = queriesToPipelineDebug$(config, true)(stateManager)(queries);
   if (errors == null) {
     return t.fail('errors should not be null');
   }
@@ -161,7 +163,7 @@ test('debug version will emit error from userstate', t => {
       Q.transforms([Q.need(true)], [], [])
     ),
   ];
-  const [errors, pots, mats] = queriesToPipelineDebug$(config, true)(queries);
+  const [errors, pots, mats] = queriesToPipelineDebug$(config, true)(stateManager)(queries);
   if (errors == null) {
     return t.fail('errors should not be null');
   }
@@ -188,7 +190,7 @@ test('debug version will emit materials and potentials stream', t => {
       Q.goal(Q.GoalKind.Splittable, Q.timeDuration(+dur(3, 'hours')), +dur(5, 'hours'))
     ),
   ];
-  const [errors, pots, mats] = queriesToPipelineDebug$(config, true)(queries);
+  const [errors, pots, mats] = queriesToPipelineDebug$(config, true)(stateManager)(queries);
   if (errors == null) {
     return t.fail('errors should not be null');
   }

@@ -5,7 +5,7 @@ import {
   isGoalQuery,
   isProviderQuery,
 } from '@autoschedule/queries-fn';
-import { queryToStatePotentials } from '@autoschedule/userstate-manager';
+
 import * as R from 'ramda';
 import 'rxjs/add/observable/combineLatest';
 import 'rxjs/add/observable/of';
@@ -39,13 +39,19 @@ const sortByStart = R.sortBy<IMaterial>(R.prop('start'));
 const getMax = <T>(prop: keyof T, list: T[]): T =>
   R.reduce(R.maxBy(R.prop(prop) as (n: any) => number), list[0], list);
 
-export const queriesToPipeline$ = (config: IConfig) => (
+export const queriesToPipeline$ = (config: IConfig) => (stateManager: stateManagerType) => (
   queries: ReadonlyArray<IQuery>
 ): Observable<ReadonlyArray<IMaterial>> => {
-  return queriesToPipelineDebug$(config, false)(queries)[2].pipe(takeLast(1));
+  return queriesToPipelineDebug$(config, false)(stateManager)(queries)[2].pipe(takeLast(1));
 };
 
+export type stateManagerType = (
+  c: IConfig
+) => (q: IQuery[]) => (q: IQuery, p: IPotentiality[], m: IMaterial[]) => IRange[];
+
 export const queriesToPipelineDebug$ = (config: IConfig, debug?: boolean) => (
+  stateManager: stateManagerType
+) => (
   queries: ReadonlyArray<IQuery>
 ): [
   Observable<any> | undefined,
@@ -59,7 +65,7 @@ export const queriesToPipelineDebug$ = (config: IConfig, debug?: boolean) => (
   const materialsWorking: Subject<boolean> = new Subject();
   const potentialsOb = distinctPotentials$(potentialsWorking, potentialsBS);
   const materialsOb = distinctMaterials$(materialsWorking, materialsBS.pipe(map(sortByStart)));
-  const userstateHandler = queryToStatePotentials('{}')(config);
+  const userstateHandler = stateManager(config);
   const toClose = closeAllBS(potentialsBS, materialsBS, errorsBS);
 
   potentialsWorking.pipe(combineLatest(materialsWorking)).subscribe(testWorkers(toClose));
