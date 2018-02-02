@@ -12,7 +12,7 @@ import { getSchedule$ } from './main.flow';
 
 type queriesObj = Array<{ readonly id: number; readonly queries: ReadonlyArray<Q.IQuery> }>;
 
-const stateManager = queryToStatePotentials('{}');
+const stateManager = queryToStatePotentials([]);
 
 const askDetails = (fn: (s: ReadonlyArray<IMaterial>) => queriesObj) => (
   s: ReadonlyArray<IMaterial>

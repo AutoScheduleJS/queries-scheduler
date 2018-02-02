@@ -85,14 +85,15 @@ const terminateIfError = (
   errorsBS: BehaviorSubject<any> | undefined,
   toClose: () => void
 ): void => {
-  if (errorsBS) {
-    errorsBS.subscribe(e => {
-      if (e == null) {
-        return;
-      }
-      setTimeout(() => toClose(), 0);
-    });
+  if (!errorsBS) {
+    return;
   }
+  errorsBS.subscribe(e => {
+    if (e == null) {
+      return;
+    }
+    setTimeout(() => toClose(), 0);
+  });
 };
 
 const testWorkers = (toClose: () => void) => (workStatus: boolean[]): void => {

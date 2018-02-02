@@ -14,7 +14,7 @@ import { ConflictError } from '../data-structures/conflict.error';
 import { IMaterial } from '../data-structures/material.interface';
 
 const dur = moment.duration;
-const stateManager = queryToStatePotentials("{}");
+const stateManager = queryToStatePotentials([]);
 
 const validateSE = (t: any, material: IMaterial, range: [number, number], id: number): void => {
   t.is(material.start, range[0]);
@@ -26,6 +26,17 @@ test('will schedule nothing when no queries', t => {
   t.plan(1);
   const config: IConfig = { endDate: +moment().add(7, 'days'), startDate: Date.now() };
   return queriesToPipeline$(config)(stateManager)([]).pipe(map(result2 => t.is(result2.length, 0)));
+});
+
+test('will schedule dummy query', t => {
+  t.plan(1);
+  const config: IConfig = { endDate: 100, startDate: 0 };
+  const queries: Q.IQuery[] = [Q.queryFactory(Q.id(1))];
+  return (queriesToPipelineDebug$(config, true)(stateManager)(queries)[0] as Observable<any>).pipe(
+    map(_ => {
+      t.pass();
+    })
+  );
 });
 
 test('will schedule one atomic query', t => {
