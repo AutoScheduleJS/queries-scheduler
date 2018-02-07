@@ -148,7 +148,7 @@ export const materializePotentiality = (
   const maxPots = updatePP(maxMaterials);
   const minAvg = potentialsToMeanPressure(minPots);
   const maxAvg = potentialsToMeanPressure(maxPots);
-  if (minAvg === maxAvg || (Number.isNaN(minAvg) && Number.isNaN(maxAvg))) {
+  if (maxMaterials.length && (minAvg === maxAvg || (Number.isNaN(minAvg) && Number.isNaN(maxAvg)))) {
     throwIfInvalidPots(toPlace)(minPots);
     return [maxMaterials, maxPots];
   }
@@ -291,8 +291,9 @@ const placeSplittable = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]
   const sortedChunks = sortByPressure(
     intersect(toPlace.places, pressure.filter(isOverlapping(toPlace.places)))
   );
-  return R.unfold(R.partial(placeSplittableUnfold, [toPlace]), [0, sortedChunks])
-    .map((material, i) => ({ ...material, splitId: i }));
+  return R.unfold(R.partial(placeSplittableUnfold, [toPlace]), [0, sortedChunks]).map(
+    (material, i) => ({ ...material, splitId: i })
+  );
 };
 
 const simulatePlacement = (

@@ -39,6 +39,21 @@ test('will schedule dummy query', t => {
   );
 });
 
+test('will schedule even if duration target is unreachable', t => {
+  t.plan(3);
+  const config: IConfig = { endDate: 100, startDate: 0 };
+  const queries: Q.IQuery[] = [
+    Q.queryFactory(Q.id(1), Q.duration(Q.timeDuration(4, 2)), Q.start(97)),
+  ];
+  return queriesToPipeline$(config)(stateManager)(queries).pipe(
+    map(result => {
+      t.is(result.length, 1);
+      t.is(result[0].start, 97);
+      t.is(result[0].end, 100);
+    })
+  );
+});
+
 test('will schedule one atomic query', t => {
   t.plan(3);
   const config: IConfig = { endDate: +moment().add(1, 'days'), startDate: Date.now() };
