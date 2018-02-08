@@ -5,7 +5,7 @@ import * as moment from 'moment';
 import 'rxjs/add/observable/forkJoin';
 import 'rxjs/add/observable/of';
 import { Observable } from 'rxjs/Observable';
-import { map, takeLast } from 'rxjs/operators';
+import { distinctUntilChanged, map, takeLast } from 'rxjs/operators';
 
 import {
   combineSchedulerObservables,
@@ -208,7 +208,7 @@ test('debug version will emit error from userstate', t => {
 });
 
 test('debug version will emit intermediate results', t => {
-  t.plan(9);
+  t.plan(23);
   const config: IConfig = { endDate: 100, startDate: 0 };
   let lap = 0;
   const queries: Q.IQuery[] = [
@@ -216,21 +216,50 @@ test('debug version will emit intermediate results', t => {
     Q.queryFactory(Q.id(2), Q.duration(Q.timeDuration(4, 2))),
   ];
   const results = queriesToPipelineDebug$(config, true)(stateManager)(queries);
-  return combineSchedulerObservables([results[0] as Observable<any>, results[1], results[2]]).pipe(
+  return combineSchedulerObservables(
+    results[0] as Observable<any>,
+    results[1],
+    results[2],
+    results[3]
+  ).pipe(
+    distinctUntilChanged(
+      (a, b) =>
+        (a[1] === b[1] && (a[1] != null && b[1] != null) && a[1].length === b[1].length) &&
+        (a[2] === b[2] && (a[2] != null && b[2] != null) && a[2].length === b[2].length) &&
+        (a[3] === b[3] && (a[3] != null && b[3] != null) && a[3].length === b[3].length)
+    ),
     map(result => {
       if (lap === 1) {
-        t.is(result.error, null);
-        t.is(result.materials.length, 0);
-        t.is(result.potentials.length, 2);
+        t.is(result[0], null);
+        t.is(result[1].length, 0);
+        t.is(result[2], null);
       } else if (lap === 2) {
-        t.is(result.error, null);
-        t.is(result.materials.length, 0);
-        t.is(result.potentials.length, 0);
+        t.is(result[0], null);
+        t.is(result[1].length, 2);
+        t.is(result[2], null);
       } else if (lap === 3) {
-        t.is(result.error, null);
-        t.is(result.potentials.length, 0);
-        t.is(result.materials.length, 2);
-      } else if (lap > 3) {
+        t.is(result[0], null);
+        t.is(result[1].length, 0);
+        t.is(result[2], null);
+      } else if (lap === 4) {
+        t.is(result[0], null);
+        t.is(result[1].length, 0);
+        t.is(result[2].length, 0);
+      } else if (lap === 5) {
+        t.is(result[0], null);
+        t.is(result[1].length, 0);
+        t.is(result[2].length, 2);
+      } else if (lap === 6) {
+        t.is(result[0], null);
+        t.is(result[1].length, 0);
+        t.is(result[2].length, 2);
+        t.is(result[3].length, 0);
+      } else if (lap === 7) {
+        t.is(result[0], null);
+        t.is(result[1].length, 0);
+        t.is(result[2].length, 2);
+        t.is(result[3].length, 1);
+      } else if (lap > 9) {
         t.fail();
       }
       lap += 1;

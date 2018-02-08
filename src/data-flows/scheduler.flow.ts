@@ -12,13 +12,7 @@ import 'rxjs/add/observable/of';
 import { BehaviorSubject } from 'rxjs/BehaviorSubject';
 import { Observable } from 'rxjs/Observable';
 import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable';
-import {
-  combineLatest,
-  distinctUntilChanged,
-  map,
-  publishReplay,
-  takeLast,
-} from 'rxjs/operators';
+import { combineLatest, distinctUntilChanged, map, publishReplay, takeLast } from 'rxjs/operators';
 import { Subject } from 'rxjs/Subject';
 
 import {
@@ -40,6 +34,7 @@ import { IConfig } from '../data-structures/config.interface';
 import { ConflictError } from '../data-structures/conflict.error';
 import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
+import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
 import { IRange } from '../data-structures/range.interface';
 
 const sortByStart = R.sortBy<IMaterial>(R.prop('start'));
@@ -63,7 +58,8 @@ export const queriesToPipelineDebug$ = (config: IConfig, debug?: boolean) => (
 ): [
   Observable<any> | undefined,
   ConnectableObservable<ReadonlyArray<IPotentiality>>,
-  ConnectableObservable<ReadonlyArray<IMaterial>>
+  ConnectableObservable<ReadonlyArray<IMaterial>>,
+  ConnectableObservable<ReadonlyArray<IPressureChunk>>
 ] => {
   const potentialsBS$ = new BehaviorSubject([] as ReadonlyArray<IPotentiality>);
   const materialsBS$ = new BehaviorSubject([] as ReadonlyArray<IMaterial>);
@@ -72,58 +68,43 @@ export const queriesToPipelineDebug$ = (config: IConfig, debug?: boolean) => (
   const materialsWorking$: Subject<boolean> = new Subject();
   const potentialsOb$ = distinctPotentials$(potentialsWorking$, potentialsBS$);
   const materialsOb$ = distinctMaterials$(materialsWorking$, materialsBS$.pipe(map(sortByStart)));
+  const pressureChunk$ = new BehaviorSubject([] as ReadonlyArray<IPressureChunk>);
   const potentialsDebug$ = potentialsOb$.pipe(publishReplay()) as ConnectableObservable<
     ReadonlyArray<IPotentiality>
   >;
   const materialsDebug$ = materialsOb$.pipe(publishReplay()) as ConnectableObservable<
     ReadonlyArray<IMaterial>
   >;
+  const pressureChunkDebug$ = pressureChunk$.pipe(publishReplay()) as ConnectableObservable<
+    ReadonlyArray<IPressureChunk>
+  >;
   const userstateHandler = stateManager(config);
-  const toClose = closeAllBS(potentialsBS$, materialsBS$, errorsBS$);
+  const toClose = closeAllBS(potentialsBS$, materialsBS$, errorsBS$, pressureChunk$);
 
   potentialsDebug$.connect();
   materialsDebug$.connect();
+  pressureChunkDebug$.connect();
 
   potentialsWorking$.pipe(combineLatest(materialsWorking$)).subscribe(testWorkers(toClose));
   terminateIfError(errorsBS$, toClose);
   Observable.combineLatest(potentialsOb$, materialsOb$).subscribe(
     buildPotentials(config, replacePotentials(potentialsBS$), userstateHandler, queries, errorsBS$)
   );
-  potentialsBS$.subscribe(buildMaterials(config, addMaterials(materialsBS$), errorsBS$));
-  return [errorsBS$, potentialsDebug$, materialsDebug$];
+  potentialsBS$.subscribe(
+    buildMaterials(config, addMaterials(materialsBS$), pressureChunk$, errorsBS$)
+  );
+  return [errorsBS$, potentialsDebug$, materialsDebug$, pressureChunkDebug$];
 };
 
 export const combineSchedulerObservables = (
-  schedulerObs: [
-    Observable<any>,
-    ConnectableObservable<ReadonlyArray<IPotentiality>>,
-    ConnectableObservable<ReadonlyArray<IMaterial>>
-  ]
-): Observable<{
-  error: any;
-  potentials: ReadonlyArray<IPotentiality>;
-  materials: ReadonlyArray<IMaterial>;
-}> => {
-  const pots$ = new BehaviorSubject<ReadonlyArray<IPotentiality>>([]);
-  const mats$ = new BehaviorSubject<ReadonlyArray<IMaterial>>([]);
+  ...schedulerObs: Array<Observable<any>>
+): Observable<any[]> => {
+  const bs = schedulerObs.map(_ => new BehaviorSubject<any>(null));
   setTimeout(() => {
-    schedulerObs[1].subscribe(v => pots$.next(v), undefined, () => pots$.complete());
-    schedulerObs[2].subscribe(v => mats$.next(v), undefined, () => mats$.complete());
+    bs.forEach((s, i) => schedulerObs[i].subscribe(v => s.next(v), undefined, () => s.complete()));
   }, 0);
 
-  return Observable.combineLatest(
-    schedulerObs[0],
-    pots$,
-    mats$,
-    (error, potentials, materials) => ({ error, potentials, materials })
-  ).pipe(
-    distinctUntilChanged((a, b) => {
-      return (
-        a.materials.length === b.materials.length &&
-        a.potentials.length === b.potentials.length
-      );
-    })
-  );
+  return Observable.combineLatest(bs);
 };
 
 const closeAllBS = (...toClose: Array<BehaviorSubject<any> | undefined>) => (): void => {
@@ -201,10 +182,11 @@ const distinctPotentials$ = (
 const buildMaterials = (
   config: IConfig,
   addMatsFn: (mats: ReadonlyArray<IMaterial>) => void,
-  debug?: BehaviorSubject<any> | undefined
+  pressureChunk$: BehaviorSubject<ReadonlyArray<IPressureChunk>>,
+  debug?: BehaviorSubject<any>
 ) => (potentials: ReadonlyArray<IPotentiality>): void => {
   const result = sortByStart(
-    R.unnest(R.unfold(R.partial(pipelineUnfolder, [config]), potentials))
+    R.unnest(R.unfold(R.partial(pipelineUnfolder, [config, pressureChunk$]), potentials))
   ) as IMaterial[];
   try {
     validateTimeline(result);
@@ -298,6 +280,7 @@ const queryToPotentiality = (config: IConfig) => (query: IQuery) => {
 
 const pipelineUnfolder = (
   config: IConfig,
+  pressureChunk$: BehaviorSubject<ReadonlyArray<IPressureChunk>>,
   potentials: IPotentiality[]
 ): false | [IMaterial[], IPotentiality[]] => {
   if (potentials.length < 1) {
@@ -309,12 +292,20 @@ const pipelineUnfolder = (
     const result = materializePotentiality(
       toPlace,
       R.partial(updatePotentialsPressureFromMats, [newPotentials]),
-      computePressureChunks(config, newPotentials)
+      emitPressureChunks(pressureChunk$, computePressureChunks(config, newPotentials))
     );
     return result;
   } catch (e) {
     return [[getErrorMaterial(toPlace)], []];
   }
+};
+
+const emitPressureChunks = (
+  pressureChunk$: BehaviorSubject<ReadonlyArray<IPressureChunk>>,
+  pressureChunk: IPressureChunk[]
+): IPressureChunk[] => {
+  pressureChunk$.next(pressureChunk);
+  return pressureChunk;
 };
 
 const getErrorMaterial = (toPlace: IPotentiality): IMaterial => ({
