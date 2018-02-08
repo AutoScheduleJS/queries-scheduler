@@ -131,6 +131,9 @@ const findMaxFinitePlacement = (
     testDuration = avgPre > myPre ? testDuration - durationDelta : testDuration + durationDelta;
   } while (Math.abs(avgPre - myPre) >= 0.1);
   throwIfInvalidPots(toPlace)(pots);
+  if (!materials.length) {
+    throw new ConflictError(toPlace.queryId);
+  }
   return [materials, pots];
 };
 
@@ -193,7 +196,7 @@ const divideChunkByDuration = (duration: number) => (chunk: IPressureChunk): IRa
 
 const rangeChunkIntersectin = (duration: number, chunks: IPressureChunk[]) => (range: IRange) => {
   const inter = intersect(range, chunks);
-  if (!inter.length || (inter[0].end - inter[0].start) < duration) {
+  if (!inter.length || inter[0].end - inter[0].start < duration) {
     return null;
   }
   return inter.reduce(scanPressure);
