@@ -11,7 +11,14 @@ import 'rxjs/add/observable/combineLatest';
 import 'rxjs/add/observable/of';
 import { BehaviorSubject } from 'rxjs/BehaviorSubject';
 import { Observable } from 'rxjs/Observable';
-import { combineLatest, distinctUntilChanged, map, takeLast } from 'rxjs/operators';
+import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable';
+import {
+  combineLatest,
+  distinctUntilChanged,
+  map,
+  publishReplay,
+  takeLast,
+} from 'rxjs/operators';
 import { Subject } from 'rxjs/Subject';
 
 import {
@@ -55,26 +62,68 @@ export const queriesToPipelineDebug$ = (config: IConfig, debug?: boolean) => (
   queries: ReadonlyArray<IQuery>
 ): [
   Observable<any> | undefined,
-  Observable<ReadonlyArray<IPotentiality>>,
-  Observable<ReadonlyArray<IMaterial>>
+  ConnectableObservable<ReadonlyArray<IPotentiality>>,
+  ConnectableObservable<ReadonlyArray<IMaterial>>
 ] => {
-  const potentialsBS = new BehaviorSubject([] as ReadonlyArray<IPotentiality>);
-  const materialsBS = new BehaviorSubject([] as ReadonlyArray<IMaterial>);
-  const errorsBS = debug ? new BehaviorSubject(null) : undefined;
-  const potentialsWorking: Subject<boolean> = new Subject();
-  const materialsWorking: Subject<boolean> = new Subject();
-  const potentialsOb = distinctPotentials$(potentialsWorking, potentialsBS);
-  const materialsOb = distinctMaterials$(materialsWorking, materialsBS.pipe(map(sortByStart)));
+  const potentialsBS$ = new BehaviorSubject([] as ReadonlyArray<IPotentiality>);
+  const materialsBS$ = new BehaviorSubject([] as ReadonlyArray<IMaterial>);
+  const errorsBS$ = debug ? new BehaviorSubject(null) : undefined;
+  const potentialsWorking$: Subject<boolean> = new Subject();
+  const materialsWorking$: Subject<boolean> = new Subject();
+  const potentialsOb$ = distinctPotentials$(potentialsWorking$, potentialsBS$);
+  const materialsOb$ = distinctMaterials$(materialsWorking$, materialsBS$.pipe(map(sortByStart)));
+  const potentialsDebug$ = potentialsOb$.pipe(publishReplay()) as ConnectableObservable<
+    ReadonlyArray<IPotentiality>
+  >;
+  const materialsDebug$ = materialsOb$.pipe(publishReplay()) as ConnectableObservable<
+    ReadonlyArray<IMaterial>
+  >;
   const userstateHandler = stateManager(config);
-  const toClose = closeAllBS(potentialsBS, materialsBS, errorsBS);
+  const toClose = closeAllBS(potentialsBS$, materialsBS$, errorsBS$);
 
-  potentialsWorking.pipe(combineLatest(materialsWorking)).subscribe(testWorkers(toClose));
-  terminateIfError(errorsBS, toClose);
-  Observable.combineLatest(potentialsOb, materialsOb).subscribe(
-    buildPotentials(config, replacePotentials(potentialsBS), userstateHandler, queries, errorsBS)
+  potentialsDebug$.connect();
+  materialsDebug$.connect();
+
+  potentialsWorking$.pipe(combineLatest(materialsWorking$)).subscribe(testWorkers(toClose));
+  terminateIfError(errorsBS$, toClose);
+  Observable.combineLatest(potentialsOb$, materialsOb$).subscribe(
+    buildPotentials(config, replacePotentials(potentialsBS$), userstateHandler, queries, errorsBS$)
   );
-  potentialsBS.subscribe(buildMaterials(config, addMaterials(materialsBS), errorsBS));
-  return [errorsBS, potentialsOb, materialsOb];
+  potentialsBS$.subscribe(buildMaterials(config, addMaterials(materialsBS$), errorsBS$));
+  return [errorsBS$, potentialsDebug$, materialsDebug$];
+};
+
+export const combineSchedulerObservables = (
+  schedulerObs: [
+    Observable<any>,
+    ConnectableObservable<ReadonlyArray<IPotentiality>>,
+    ConnectableObservable<ReadonlyArray<IMaterial>>
+  ]
+): Observable<{
+  error: any;
+  potentials: ReadonlyArray<IPotentiality>;
+  materials: ReadonlyArray<IMaterial>;
+}> => {
+  const pots$ = new BehaviorSubject<ReadonlyArray<IPotentiality>>([]);
+  const mats$ = new BehaviorSubject<ReadonlyArray<IMaterial>>([]);
+  setTimeout(() => {
+    schedulerObs[1].subscribe(v => pots$.next(v), undefined, () => pots$.complete());
+    schedulerObs[2].subscribe(v => mats$.next(v), undefined, () => mats$.complete());
+  }, 0);
+
+  return Observable.combineLatest(
+    schedulerObs[0],
+    pots$,
+    mats$,
+    (error, potentials, materials) => ({ error, potentials, materials })
+  ).pipe(
+    distinctUntilChanged((a, b) => {
+      return (
+        a.materials.length === b.materials.length &&
+        a.potentials.length === b.potentials.length
+      );
+    })
+  );
 };
 
 const closeAllBS = (...toClose: Array<BehaviorSubject<any> | undefined>) => (): void => {
@@ -177,16 +226,16 @@ const buildPotentials = (
   replacePotsFn: (pots: ReadonlyArray<IPotentiality>) => void,
   userstateHandler: handleUserState,
   queries: ReadonlyArray<IQuery>,
-  debug: BehaviorSubject<any> | undefined
+  errorDebug: BehaviorSubject<any> | undefined
 ) => ([potentials, materials]: [ReadonlyArray<IPotentiality>, ReadonlyArray<IMaterial>]): void => {
   const newUserstateHandler = (query: IQuery, pot: ReadonlyArray<IPotentiality>) => {
     try {
       return userstateHandler([...queries])(query, [...pot], [...materials]);
     } catch (e) {
-      if (!debug) {
+      if (!errorDebug) {
         throw e;
       }
-      debug.next(e);
+      errorDebug.next(e);
       return [{ start: -2, end: -2 }];
     }
   };

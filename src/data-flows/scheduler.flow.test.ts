@@ -7,7 +7,11 @@ import 'rxjs/add/observable/of';
 import { Observable } from 'rxjs/Observable';
 import { map, takeLast } from 'rxjs/operators';
 
-import { queriesToPipeline$, queriesToPipelineDebug$ } from './scheduler.flow';
+import {
+  combineSchedulerObservables,
+  queriesToPipeline$,
+  queriesToPipelineDebug$,
+} from './scheduler.flow';
 
 import { IConfig } from '../data-structures/config.interface';
 import { ConflictError } from '../data-structures/conflict.error';
@@ -199,6 +203,37 @@ test('debug version will emit error from userstate', t => {
       if (error) {
         t.pass('should emit errors');
       }
+    })
+  );
+});
+
+test('debug version will emit intermediate results', t => {
+  t.plan(9);
+  const config: IConfig = { endDate: 100, startDate: 0 };
+  let lap = 0;
+  const queries: Q.IQuery[] = [
+    Q.queryFactory(Q.id(1), Q.duration(Q.timeDuration(4, 2))),
+    Q.queryFactory(Q.id(2), Q.duration(Q.timeDuration(4, 2))),
+  ];
+  const results = queriesToPipelineDebug$(config, true)(stateManager)(queries);
+  return combineSchedulerObservables([results[0] as Observable<any>, results[1], results[2]]).pipe(
+    map(result => {
+      if (lap === 1) {
+        t.is(result.error, null);
+        t.is(result.materials.length, 0);
+        t.is(result.potentials.length, 2);
+      } else if (lap === 2) {
+        t.is(result.error, null);
+        t.is(result.materials.length, 0);
+        t.is(result.potentials.length, 0);
+      } else if (lap === 3) {
+        t.is(result.error, null);
+        t.is(result.potentials.length, 0);
+        t.is(result.materials.length, 2);
+      } else if (lap > 3) {
+        t.fail();
+      }
+      lap += 1;
     })
   );
 });
