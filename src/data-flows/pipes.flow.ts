@@ -148,7 +148,10 @@ export const materializePotentiality = (
   const maxPots = updatePP(maxMaterials);
   const minAvg = potentialsToMeanPressure(minPots);
   const maxAvg = potentialsToMeanPressure(maxPots);
-  if (maxMaterials.length && (minAvg === maxAvg || (Number.isNaN(minAvg) && Number.isNaN(maxAvg)))) {
+  if (
+    maxMaterials.length &&
+    (minAvg === maxAvg || (Number.isNaN(minAvg) && Number.isNaN(maxAvg)))
+  ) {
     throwIfInvalidPots(toPlace)(minPots);
     return [maxMaterials, maxPots];
   }
@@ -188,9 +191,9 @@ const divideChunkByDuration = (duration: number) => (chunk: IPressureChunk): IRa
   ];
 };
 
-const rangeChunkIntersectin = (chunks: IPressureChunk[]) => (range: IRange) => {
+const rangeChunkIntersectin = (duration: number, chunks: IPressureChunk[]) => (range: IRange) => {
   const inter = intersect(range, chunks);
-  if (!inter.length) {
+  if (!inter.length || (inter[0].end - inter[0].start) < duration) {
     return null;
   }
   return inter.reduce(scanPressure);
@@ -205,7 +208,7 @@ const computeContiguousPressureChunk = (
   }
   return R.unnest(chunks.map(divideChunkByDuration(duration)))
     .filter(c => c.start >= firstTimeRange(chunks) && c.end <= lastTimeRange(chunks))
-    .map(rangeChunkIntersectin(chunks))
+    .map(rangeChunkIntersectin(duration, chunks))
     .filter(p => p != null) as IPressureChunk[];
 };
 
@@ -254,7 +257,7 @@ const minimizeChunkToDuration = (chunk: IPressureChunk, duration: number): IPres
 
 const placeAtomic = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]): IMaterial[] => {
   if (toPlace.places.length === 1 && rangeToDuration(toPlace.places[0]) === toPlace.duration) {
-    const result = rangeChunkIntersectin(pressure)(toPlace.places[0]);
+    const result = rangeChunkIntersectin(toPlace.duration, pressure)(toPlace.places[0]);
     if (result) {
       return [rangeToMaterial(toPlace, result)];
     }

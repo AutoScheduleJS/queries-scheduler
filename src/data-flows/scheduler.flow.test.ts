@@ -43,6 +43,25 @@ test('will schedule dummy query', t => {
   );
 });
 
+test('will properly use pressureChunk and minDuration', t => {
+  t.plan(5);
+  const config: IConfig = { endDate: 100, startDate: 0 };
+  const queries: Q.IQuery[] = [
+    Q.queryFactory(Q.id(1), Q.duration(Q.timeDuration(4, 2))),
+    Q.queryFactory(Q.id(2), Q.duration(Q.timeDuration(4, 2))),
+    Q.queryFactory(Q.id(3), Q.duration(Q.timeDuration(4, 2)), Q.start(1), Q.end(5)),
+  ];
+  return queriesToPipeline$(config)(stateManager)(queries).pipe(
+    map(result => {
+      t.is(result.length, 3);
+      t.is(result[0].start, 1);
+      t.is(result[0].end, 5);
+      t.is(result[1].start, 5);
+      t.is(result[1].end, 9);
+    })
+  );
+});
+
 test('will schedule even if duration target is unreachable', t => {
   t.plan(3);
   const config: IConfig = { endDate: 100, startDate: 0 };
@@ -224,7 +243,9 @@ test('debug version will emit intermediate results', t => {
   ).pipe(
     distinctUntilChanged(
       (a, b) =>
-        (a[1] === b[1] && (a[1] != null && b[1] != null) && a[1].length === b[1].length) &&
+        a[1] === b[1] &&
+        (a[1] != null && b[1] != null) &&
+        a[1].length === b[1].length &&
         (a[2] === b[2] && (a[2] != null && b[2] != null) && a[2].length === b[2].length) &&
         (a[3] === b[3] && (a[3] != null && b[3] != null) && a[3].length === b[3].length)
     ),
