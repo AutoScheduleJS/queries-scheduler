@@ -210,21 +210,26 @@ const buildPotentials = (
   queries: ReadonlyArray<IQuery>,
   errorDebug: BehaviorSubject<any> | undefined
 ) => ([potentials, materials]: [ReadonlyArray<IPotentiality>, ReadonlyArray<IMaterial>]): void => {
-  const newUserstateHandler = (query: IQuery, pot: ReadonlyArray<IPotentiality>) => {
+  const newUserstateHandler = (query: IQuery, pots: ReadonlyArray<IPotentiality>) => {
     try {
-      return userstateHandler([...queries])(query, [...pot], [...materials]);
+      const otherPots = pots.filter(
+        pot =>
+          !materials.find(mat => mat.queryId === pot.queryId && mat.materialId === pot.potentialId)
+      );
+      const otherMats = materials.filter(mat => mat.queryId !== query.id);
+      const userstateMask = userstateHandler([...queries])(query, [...otherPots], [...otherMats]);
+      return userstateMask;
     } catch (e) {
-      if (!errorDebug) {
-        throw e;
-      }
-      errorDebug.next(e);
+      // if (!errorDebug) {
+      //   throw e;
+      // }
+      // errorDebug.next(e);
       return [{ start: -2, end: -2 }];
     }
   };
+
   const result = updatePotentialsPressureFromMats(
-    queriesToPotentialities(config, queries, potentials, newUserstateHandler).filter(pots =>
-      materials.every(material => material.materialId !== pots.potentialId)
-    ),
+    queriesToPotentialities(config, queries, potentials, newUserstateHandler),
     materials
   );
   replacePotsFn(result);
@@ -255,7 +260,7 @@ const replacePotentials = (potentials$: BehaviorSubject<ReadonlyArray<IPotential
 const addMaterials = (materials$: BehaviorSubject<ReadonlyArray<IMaterial>>) => (
   materials: ReadonlyArray<IMaterial>
 ): void => {
-  materials$.next([...materials$.value, ...materials]);
+  materials$.next([/*...materials$.value, */...materials]);
 };
 
 const validateTimeline = (materials: IMaterial[]): void => {

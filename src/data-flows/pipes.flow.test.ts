@@ -19,15 +19,16 @@ import {
 const potentialFactory = (
   dur: ITimeDuration,
   places: IRange[],
-  pressure?: number
+  pressure = 0,
+  queryId = 42,
 ): IPotentiality => {
   return {
     duration: { ...dur },
     isSplittable: false,
     places: [...places],
     potentialId: 1,
-    pressure: pressure || 0,
-    queryId: 42,
+    pressure,
+    queryId,
   };
 };
 
@@ -123,7 +124,7 @@ test('will materialize splittable potentiality', t => {
     ...potentialFactory({ min: 1, target: 9 }, [{ end: 10, start: 0 }], 0.6),
     isSplittable: true,
   };
-  const pots = [potentialFactory({ min: 5, target: 5 }, [{ end: 8, start: 3 }], 1)];
+  const pots = [potentialFactory({ min: 5, target: 5 }, [{ end: 8, start: 3 }], 1, 66)];
   const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, pots);
   const materials = materializePotentiality(
     toPlace,

@@ -103,7 +103,10 @@ export const updatePotentialsPressureFromMats = (
     R.pipe(
       (p: IPotentiality) => ({
         ...p,
-        places: substract(p.places, masks),
+        places: substract(
+          p.places,
+          masks.filter(m => m.queryId !== p.queryId || m.materialId !== p.potentialId)
+        ),
       }),
       (p: IPotentiality) => ({ ...p, pressure: computePressure(p) })
     )

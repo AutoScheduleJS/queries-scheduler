@@ -159,6 +159,29 @@ test('will schedule one splittable goal with one atomic', t => {
   );
 });
 
+test('will find space where resource is available from material', t => {
+  const config: IConfig = { endDate: 100, startDate: 0 };
+  const query = Q.queryFactory(
+    Q.duration(Q.timeDuration(1)),
+    Q.transforms([Q.need(true, 'test', { response: 42 }, 1)], [], [])
+  );
+  const provide = Q.queryFactory(
+    Q.id(66),
+    Q.start(2),
+    Q.end(3),
+    Q.transforms([], [], [{ collectionName: 'test', doc: { response: 42 } }])
+  );
+  return queriesToPipeline$(config)(stateManager)([query, provide]).pipe(
+    map(result => {
+      t.is(result.length, 2);
+      t.true(result[0].start === 2);
+      t.true(result[0].end === 3);
+      t.true(result[1].start === 99);
+      t.true(result[1].end === 100);
+    })
+  );
+});
+
 test('will emit error from userstate', t => {
   const config: IConfig = { endDate: +moment().add(3, 'days'), startDate: Date.now() };
   const durTarget = +dur(5, 'minutes');
@@ -260,27 +283,27 @@ test('debug version will emit intermediate results', t => {
         t.is(result[2], null);
       } else if (lap === 3) {
         t.is(result[0], null);
-        t.is(result[1].length, 0);
+        t.is(result[1].length, 2);
         t.is(result[2], null);
       } else if (lap === 4) {
         t.is(result[0], null);
-        t.is(result[1].length, 0);
+        t.is(result[1].length, 2);
         t.is(result[2].length, 0);
       } else if (lap === 5) {
         t.is(result[0], null);
-        t.is(result[1].length, 0);
+        t.is(result[1].length, 2);
         t.is(result[2].length, 2);
       } else if (lap === 6) {
         t.is(result[0], null);
-        t.is(result[1].length, 0);
+        t.is(result[1].length, 2);
         t.is(result[2].length, 2);
         t.is(result[3].length, 0);
       } else if (lap === 7) {
         t.is(result[0], null);
-        t.is(result[1].length, 0);
+        t.is(result[1].length, 2);
         t.is(result[2].length, 2);
         t.is(result[3].length, 1);
-      } else if (lap > 9) {
+      } else if (lap > 12) {
         t.fail();
       }
       lap += 1;

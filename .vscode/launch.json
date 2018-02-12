@@ -1,0 +1,36 @@
+{
+  // Utilisez IntelliSense pour en savoir plus sur les attributs possibles.
+  // Pointez pour afficher la description des attributs existants.
+  // Pour plus d'informations, visitez : https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run main AVA tests",
+      "program": "${workspaceRoot}/node_modules/ava/profile.js",
+      "args": [
+        "${workspaceFolder}/build/data-flows/main.flow.test.js"
+      ]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run scheduler AVA tests",
+      "program": "${workspaceRoot}/node_modules/ava/profile.js",
+      "args": [
+        "${workspaceFolder}/build/data-flows/scheduler.flow.test.js"
+      ]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run pipes AVA tests",
+      "program": "${workspaceRoot}/node_modules/ava/profile.js",
+      "args": [
+        "${workspaceFolder}/build/data-flows/pipes.flow.test.js"
+      ]
+    }
+  ]
+}

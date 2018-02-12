@@ -15,7 +15,7 @@ workflow:
 queries -> schedule
 
 needs:
-- once material is placed, don't replace it. Causes loops. Temporary query instead.
+- once material is placed, don't replace it. Causes loops. Temporary query instead. (Current behavior is different: potentials and materials streams are re-compute after each mutation and we check for stability)
 
 operations:
 - place potentials with most pressure.
