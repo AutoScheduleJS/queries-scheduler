@@ -1,9 +1,14 @@
 import { ITimeDuration } from '@autoschedule/queries-fn';
 import test from 'ava';
 import { isEqual } from 'intervals-fn';
+import { BehaviorSubject } from 'rxjs/BehaviorSubject';
+import { Observable } from 'rxjs/Observable';
+
+import 'rxjs/add/observable/zip';
+import { map } from 'rxjs/operators';
 
 import { IConfig } from '../data-structures/config.interface';
-import { ConflictError } from '../data-structures/conflict.error';
+// import { ConflictError } from '../data-structures/conflict.error';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
 import { IRange } from '../data-structures/range.interface';
@@ -20,7 +25,7 @@ const potentialFactory = (
   dur: ITimeDuration,
   places: IRange[],
   pressure = 0,
-  queryId = 42,
+  queryId = 42
 ): IPotentiality => {
   return {
     duration: { ...dur },
@@ -96,7 +101,12 @@ test('will materialize atomic potentiality', t => {
     potentialFactory({ min: 4, target: 4 }, [{ end: 10, start: 6 }], 1),
   ];
   const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, pots);
-  const materials = materializePotentiality(toPlace, () => pots, pChunks)[0];
+  const materials = materializePotentiality(
+    toPlace,
+    () => pots,
+    pChunks,
+    new BehaviorSubject(null)
+  )[0];
   t.is(materials.length, 1);
   t.true(materials[0].start === 5 && materials[0].end === 6);
 });
@@ -104,7 +114,12 @@ test('will materialize atomic potentiality', t => {
 test('will materialize atomic within big chunk', t => {
   const toPlace = potentialFactory({ min: 1, target: 1 }, [{ end: 7, start: 4 }], 1);
   const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, []);
-  const materials = materializePotentiality(toPlace, () => [], pChunks)[0];
+  const materials = materializePotentiality(
+    toPlace,
+    () => [],
+    pChunks,
+    new BehaviorSubject(null)
+  )[0];
   t.is(materials.length, 1);
   t.is(materials[0].start, 4);
   t.is(materials[0].end, 5);
@@ -113,7 +128,12 @@ test('will materialize atomic within big chunk', t => {
 test('will materialize without concurrent potentials', t => {
   const toPlace = potentialFactory({ min: 0, target: 1 }, [{ end: 10, start: 0 }], 0.5);
   const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, []);
-  const materials = materializePotentiality(toPlace, () => [], pChunks)[0];
+  const materials = materializePotentiality(
+    toPlace,
+    () => [],
+    pChunks,
+    new BehaviorSubject(null)
+  )[0];
   t.is(materials.length, 1);
   t.is(materials[0].start, 0);
   t.is(materials[0].end, 1);
@@ -129,7 +149,8 @@ test('will materialize splittable potentiality', t => {
   const materials = materializePotentiality(
     toPlace,
     updatePotentialsPressureFromMats.bind(null, pots),
-    pChunks
+    pChunks,
+    new BehaviorSubject(null)
   )[0];
   t.is(materials.length, 2);
   t.true(materials[0].start === 0 && materials[0].end === 3);
@@ -137,28 +158,26 @@ test('will materialize splittable potentiality', t => {
 });
 
 test('materialize will throw if no place available', t => {
-  t.plan(2);
+  t.plan(1);
   const toPlace = potentialFactory({ min: 5, target: 10 }, [{ end: 10, start: 0 }], 0.6);
   const pChunks: IPressureChunk[] = [];
-  t.throws(
-    materializePotentiality.bind(
-      null,
-      toPlace,
-      updatePotentialsPressureFromMats.bind(null, []),
-      pChunks
-    ),
-    ConflictError
+  const errors1 = new BehaviorSubject(null);
+  const errors2 = new BehaviorSubject(null);
+
+  materializePotentiality(
+    toPlace,
+    updatePotentialsPressureFromMats.bind(null, []),
+    pChunks,
+    errors1
   );
   const pChunks2 = computePressureChunks({ startDate: 42, endDate: 52 }, []);
-  t.throws(
-    materializePotentiality.bind(
-      null,
-      toPlace,
-      updatePotentialsPressureFromMats.bind(null, []),
-      pChunks2
-    ),
-    ConflictError
+  materializePotentiality(
+    toPlace,
+    updatePotentialsPressureFromMats.bind(null, []),
+    pChunks2,
+    errors2
   );
+  return Observable.zip(errors1, errors2).pipe(map(vals => t.pass('should have errors')));
 });
 
 test('materialize will throw if not placable without conflict', t => {

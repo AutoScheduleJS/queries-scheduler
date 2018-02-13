@@ -167,15 +167,14 @@ test('will find space where resource is available from material', t => {
   );
   const provide = Q.queryFactory(
     Q.id(66),
-    Q.start(2),
-    Q.end(3),
+    Q.duration(Q.timeDuration(1)),
     Q.transforms([], [], [{ collectionName: 'test', doc: { response: 42 } }])
   );
   return queriesToPipeline$(config)(stateManager)([query, provide]).pipe(
     map(result => {
       t.is(result.length, 2);
-      t.true(result[0].start === 2);
-      t.true(result[0].end === 3);
+      t.true(result[0].start === 0);
+      t.true(result[0].end === 1);
       t.true(result[1].start === 99);
       t.true(result[1].end === 100);
     })
