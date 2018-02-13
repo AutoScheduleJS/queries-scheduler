@@ -1,7 +1,7 @@
 import { IMaterial } from './material.interface';
 
 export class ConflictError extends Error {
-  private materialsIntern: IMaterial[];
+  private materialsIntern: IMaterial[] = [];
   constructor(private id: number, ...params: any[]) {
     super(...params);
   }
