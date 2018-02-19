@@ -8,11 +8,12 @@ import {
 
 import * as R from 'ramda';
 import 'rxjs/add/observable/combineLatest';
+import 'rxjs/add/observable/forkJoin';
 import 'rxjs/add/observable/of';
 import { BehaviorSubject } from 'rxjs/BehaviorSubject';
 import { Observable } from 'rxjs/Observable';
 import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable';
-import { combineLatest, distinctUntilChanged, map, publishReplay, takeLast } from 'rxjs/operators';
+import { combineLatest, distinctUntilChanged, map, publishReplay } from 'rxjs/operators';
 import { Subject } from 'rxjs/Subject';
 
 import {
@@ -31,7 +32,7 @@ import {
 } from '../data-flows/queries.flow';
 
 import { IConfig } from '../data-structures/config.interface';
-import { ConflictError } from '../data-structures/conflict.error';
+// import { ConflictError } from '../data-structures/conflict.error';
 import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
@@ -44,7 +45,18 @@ const getMax = <T>(prop: keyof T, list: T[]): T =>
 export const queriesToPipeline$ = (config: IConfig) => (stateManager: stateManagerType) => (
   queries: ReadonlyArray<IQuery>
 ): Observable<ReadonlyArray<IMaterial>> => {
-  return queriesToPipelineDebug$(config, false)(stateManager)(queries)[2].pipe(takeLast(1));
+  return Observable.forkJoin(queriesToPipelineDebug$(config, false)(stateManager)(queries)).pipe(
+    map((values: any) => {
+      if (values[0] != null) {
+        throw valueToError(values);
+      }
+      return values[2];
+    })
+  );
+};
+
+const valueToError = (values: any) => {
+  return new Error(`${values[0]}`);
 };
 
 export type stateManagerType = (
@@ -56,14 +68,14 @@ export const queriesToPipelineDebug$ = (config: IConfig, debug?: boolean) => (
 ) => (
   queries: ReadonlyArray<IQuery>
 ): [
-  Observable<any> | undefined,
+  Observable<any>,
   ConnectableObservable<ReadonlyArray<IPotentiality>>,
   ConnectableObservable<ReadonlyArray<IMaterial>>,
   ConnectableObservable<ReadonlyArray<IPressureChunk>>
 ] => {
   const potentialsBS$ = new BehaviorSubject([] as ReadonlyArray<IPotentiality>);
   const materialsBS$ = new BehaviorSubject([] as ReadonlyArray<IMaterial>);
-  const errorsBS$ = debug ? new BehaviorSubject(null) : undefined;
+  const errorsBS$ = new BehaviorSubject(null);
   const potentialsWorking$: Subject<boolean> = new Subject();
   const materialsWorking$: Subject<boolean> = new Subject();
   const potentialsOb$ = distinctPotentials$(potentialsWorking$, potentialsBS$);
@@ -86,7 +98,6 @@ export const queriesToPipelineDebug$ = (config: IConfig, debug?: boolean) => (
   pressureChunkDebug$.connect();
 
   potentialsWorking$.pipe(combineLatest(materialsWorking$)).subscribe(testWorkers(toClose));
-  terminateIfError(errorsBS$, toClose);
   Observable.combineLatest(potentialsOb$, materialsOb$).subscribe(
     buildPotentials(config, replacePotentials(potentialsBS$), userstateHandler, queries, errorsBS$)
   );
@@ -107,23 +118,8 @@ export const combineSchedulerObservables = (
   return Observable.combineLatest(bs);
 };
 
-const closeAllBS = (...toClose: Array<BehaviorSubject<any> | undefined>) => (): void => {
-  toClose.forEach(bs => (bs ? bs.complete() : null));
-};
-
-const terminateIfError = (
-  errorsBS: BehaviorSubject<any> | undefined,
-  toClose: () => void
-): void => {
-  if (!errorsBS) {
-    return;
-  }
-  errorsBS.subscribe(e => {
-    if (e == null) {
-      return;
-    }
-    setTimeout(() => toClose(), 0);
-  });
+const closeAllBS = (...toClose: Array<BehaviorSubject<any>>) => (): void => {
+  toClose.forEach(bs => bs.complete());
 };
 
 const testWorkers = (toClose: () => void) => (workStatus: boolean[]): void => {
@@ -181,22 +177,14 @@ const distinctPotentials$ = (
 
 const buildMaterials = (
   config: IConfig,
-  addMatsFn: (mats: ReadonlyArray<IMaterial>) => void,
+  replaceMatsFn: (mats: ReadonlyArray<IMaterial>) => void,
   pressureChunk$: BehaviorSubject<ReadonlyArray<IPressureChunk>>,
-  debug?: BehaviorSubject<any>
+  error$: BehaviorSubject<any>
 ) => (potentials: ReadonlyArray<IPotentiality>): void => {
   const result = sortByStart(
-    R.unnest(R.unfold(R.partial(pipelineUnfolder, [config, pressureChunk$]), potentials))
+    R.unnest(R.unfold(R.partial(pipelineUnfolder, [config, pressureChunk$, error$]), potentials))
   ) as IMaterial[];
-  try {
-    validateTimeline(result);
-  } catch (e) {
-    if (!debug) {
-      throw e;
-    }
-    debug.next(e);
-  }
-  addMatsFn(result);
+  replaceMatsFn(result);
 };
 
 type handleUserState = (
@@ -208,7 +196,7 @@ const buildPotentials = (
   replacePotsFn: (pots: ReadonlyArray<IPotentiality>) => void,
   userstateHandler: handleUserState,
   queries: ReadonlyArray<IQuery>,
-  errorDebug: BehaviorSubject<any> | undefined
+  error$: BehaviorSubject<any>
 ) => ([potentials, materials]: [ReadonlyArray<IPotentiality>, ReadonlyArray<IMaterial>]): void => {
   const newUserstateHandler = (query: IQuery, pots: ReadonlyArray<IPotentiality>) => {
     try {
@@ -220,10 +208,7 @@ const buildPotentials = (
       const userstateMask = userstateHandler([...queries])(query, [...otherPots], [...otherMats]);
       return userstateMask;
     } catch (e) {
-      // if (!errorDebug) {
-      //   throw e;
-      // }
-      // errorDebug.next(e);
+      error$.next(e);
       return [{ start: -2, end: -2 }];
     }
   };
@@ -232,7 +217,11 @@ const buildPotentials = (
     queriesToPotentialities(config, queries, potentials, newUserstateHandler),
     materials
   );
-  replacePotsFn(result);
+  const filteredResult = result.filter(pot => pot.places.length);
+  if (result.length === filteredResult.length) {
+    error$.next(null);
+  }
+  replacePotsFn(filteredResult);
 };
 
 const queriesToPotentialities = (
@@ -260,20 +249,7 @@ const replacePotentials = (potentials$: BehaviorSubject<ReadonlyArray<IPotential
 const addMaterials = (materials$: BehaviorSubject<ReadonlyArray<IMaterial>>) => (
   materials: ReadonlyArray<IMaterial>
 ): void => {
-  materials$.next([/*...materials$.value, */...materials]);
-};
-
-const validateTimeline = (materials: IMaterial[]): void => {
-  const last = R.last(materials);
-  if (!last) {
-    return;
-  }
-  if (last.end !== -1 || last.start !== -1) {
-    return;
-  }
-  const error = new ConflictError(last.queryId);
-  error.materials = R.init(materials);
-  throw error;
+  materials$.next([...materials]);
 };
 
 const queryToPotentiality = (config: IConfig) => (query: IQuery) => {
@@ -286,6 +262,7 @@ const queryToPotentiality = (config: IConfig) => (query: IQuery) => {
 const pipelineUnfolder = (
   config: IConfig,
   pressureChunk$: BehaviorSubject<ReadonlyArray<IPressureChunk>>,
+  error$: BehaviorSubject<any>,
   potentials: IPotentiality[]
 ): false | [IMaterial[], IPotentiality[]] => {
   if (potentials.length < 1) {
@@ -293,16 +270,13 @@ const pipelineUnfolder = (
   }
   const toPlace = getMax('pressure', potentials);
   const newPotentials = R.without([toPlace], potentials);
-  try {
-    const result = materializePotentiality(
-      toPlace,
-      R.partial(updatePotentialsPressureFromMats, [newPotentials]),
-      emitPressureChunks(pressureChunk$, computePressureChunks(config, newPotentials))
-    );
-    return result;
-  } catch (e) {
-    return [[getErrorMaterial(toPlace)], []];
-  }
+  const result = materializePotentiality(
+    toPlace,
+    R.partial(updatePotentialsPressureFromMats, [newPotentials]),
+    emitPressureChunks(pressureChunk$, computePressureChunks(config, newPotentials)),
+    error$
+  );
+  return result;
 };
 
 const emitPressureChunks = (
@@ -312,13 +286,6 @@ const emitPressureChunks = (
   pressureChunk$.next(pressureChunk);
   return pressureChunk;
 };
-
-const getErrorMaterial = (toPlace: IPotentiality): IMaterial => ({
-  end: -1,
-  materialId: toPlace.potentialId,
-  queryId: toPlace.queryId,
-  start: -1,
-});
 
 const queryToMask = R.curry((config: IConfig, query: IQuery): IRange[] => {
   if (isGoalQuery(query) || isProviderQuery(query)) {
