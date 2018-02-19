@@ -178,6 +178,26 @@ test('will find space where resource is available from material', t => {
   );
 });
 
+test.only('provider will wait consumere', t => {
+  const config: IConfig = { endDate: 100, startDate: 0 };
+  const consumer = Q.queryFactory(
+    Q.id(1),
+    Q.start(1),
+    Q.end(5),
+    Q.transforms([Q.need(false, 'col', { test: 'toto' }, 1, 'ref')], [], [])
+  );
+  const provider = Q.queryFactory(
+    Q.id(2),
+    Q.duration(Q.timeDuration(4, 2)),
+    Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'toto' }, wait: true }])
+  );
+  return queriesToPipeline$(config)(stateManager)([consumer, provider]).pipe(
+    map(result => {
+      t.is(result.length, 2);
+    })
+  );
+});
+
 test('will emit error from userstate', t => {
   const config: IConfig = { endDate: +moment().add(3, 'days'), startDate: Date.now() };
   const durTarget = +dur(5, 'minutes');
