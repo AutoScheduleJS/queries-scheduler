@@ -1,6 +1,7 @@
 import { ITimeDuration } from '@autoschedule/queries-fn';
 import { intersect, isDuring, isOverlapping, substract } from 'intervals-fn';
 import * as R from 'ramda';
+import { BehaviorSubject } from 'rxjs/BehaviorSubject';
 
 import { IConfig } from '../data-structures/config.interface';
 import { ConflictError } from '../data-structures/conflict.error';
@@ -116,7 +117,8 @@ export const updatePotentialsPressureFromMats = (
 const findMaxFinitePlacement = (
   toPlace: IPotentiality,
   updatePP: (m: IMaterial[]) => IPotentiality[],
-  pressure: IPressureChunk[]
+  pressure: IPressureChunk[],
+  error$: BehaviorSubject<any>
 ): [IMaterial[], IPotentiality[]] => {
   const minDur = toPlace.duration.min;
   let durationDelta = toPlace.duration.target - minDur;
@@ -133,9 +135,10 @@ const findMaxFinitePlacement = (
     durationDelta /= 2;
     testDuration = avgPre > myPre ? testDuration - durationDelta : testDuration + durationDelta;
   } while (Math.abs(avgPre - myPre) >= 0.1);
-  throwIfInvalidPots(toPlace)(pots);
-  if (!materials.length) {
-    throw new ConflictError(toPlace.queryId);
+  const err: [IMaterial[], IPotentiality[]] = [[], pots];
+  if (!materials.length || !validatePotentials(pots)) {
+    error$.next(new ConflictError(toPlace.queryId)); // Throw pots with pressure > 1
+    return err;
   }
   return [materials, pots];
 };
@@ -143,12 +146,14 @@ const findMaxFinitePlacement = (
 export const materializePotentiality = (
   toPlace: IPotentiality,
   updatePP: (m: IMaterial[]) => IPotentiality[],
-  pressure: IPressureChunk[]
+  pressure: IPressureChunk[],
+  error$: BehaviorSubject<any>
 ): [IMaterial[], IPotentiality[]] => {
   const minMaterials = simulatePlacement(potToSimul('min', toPlace), pressure);
   const maxMaterials = simulatePlacement(potToSimul('target', toPlace), pressure);
   if (!minMaterials.length && !maxMaterials.length) {
-    throw new ConflictError(toPlace.queryId);
+    error$.next(new ConflictError(toPlace.queryId));
+    return [[], updatePP([])];
   }
   const minPots = updatePP(minMaterials);
   const maxPots = updatePP(maxMaterials);
@@ -158,10 +163,13 @@ export const materializePotentiality = (
     maxMaterials.length &&
     (minAvg === maxAvg || (Number.isNaN(minAvg) && Number.isNaN(maxAvg)))
   ) {
-    throwIfInvalidPots(toPlace)(minPots);
-    return [maxMaterials, maxPots];
+    if (validatePotentials(minPots)) {
+      return [maxMaterials, maxPots];
+    }
+    error$.next(new ConflictError(toPlace.queryId)); // use pots with > 1 pressure
+    return [[], updatePP([])];
   }
-  return findMaxFinitePlacement(toPlace, updatePP, pressure);
+  return findMaxFinitePlacement(toPlace, updatePP, pressure, error$);
 };
 
 const getProportionalPressure = (
@@ -316,11 +324,6 @@ const simulatePlacement = (
 };
 
 const validatePotentials = R.none(R.propSatisfies(p => p > 1, 'pressure'));
-const throwIfInvalid = (validator: (d: any) => boolean) => (toPlace: IPotentiality) =>
-  R.unless(validator, () => {
-    throw new ConflictError(toPlace.queryId);
-  });
-const throwIfInvalidPots = throwIfInvalid(validatePotentials);
 
 const potentialsToMeanPressure = R.pipe(
   (pots: IPotentiality[]) =>
