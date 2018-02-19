@@ -178,11 +178,11 @@ test('will find space where resource is available from material', t => {
   );
 });
 
-test.only('provider will wait consumere', t => {
+test('provider will wait consumere', t => {
   const config: IConfig = { endDate: 100, startDate: 0 };
   const consumer = Q.queryFactory(
     Q.id(1),
-    Q.start(1),
+    Q.start(3),
     Q.end(5),
     Q.transforms([Q.need(false, 'col', { test: 'toto' }, 1, 'ref')], [], [])
   );
