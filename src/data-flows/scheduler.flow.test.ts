@@ -202,6 +202,29 @@ test('provider will wait consumer', t => {
   );
 });
 
+test('provider will error when impossible to place', t => {
+  const config: IConfig = { endDate: 100, startDate: 0 };
+  const consumer = Q.queryFactory(
+    Q.id(1),
+    Q.start(1),
+    Q.end(5),
+    Q.transforms([Q.need(false, 'col', { test: 'toto' }, 1, 'ref')], [], [])
+  );
+  const provider = Q.queryFactory(
+    Q.id(2),
+    Q.duration(Q.timeDuration(4, 2)),
+    Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'toto' }, wait: true }])
+  );
+  return queriesToPipelineDebug$(config, true)(stateManager)([consumer, provider])[2].pipe(
+    takeLast(1),
+    map(result => {
+      t.is(result.length, 0);
+      t.is(result[0].start, -1);
+      t.is(result[0].end, -1);
+    })
+  );
+});
+
 test('will emit error from userstate', t => {
   const config: IConfig = { endDate: +moment().add(3, 'days'), startDate: Date.now() };
   const durTarget = +dur(5, 'minutes');
