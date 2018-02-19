@@ -118,7 +118,7 @@ const findMaxFinitePlacement = (
   toPlace: IPotentiality,
   updatePP: (m: IMaterial[]) => IPotentiality[],
   pressure: IPressureChunk[],
-  error$: BehaviorSubject<any>,
+  error$: BehaviorSubject<any>
 ): [IMaterial[], IPotentiality[]] => {
   const minDur = toPlace.duration.min;
   let durationDelta = toPlace.duration.target - minDur;
@@ -135,19 +135,12 @@ const findMaxFinitePlacement = (
     durationDelta /= 2;
     testDuration = avgPre > myPre ? testDuration - durationDelta : testDuration + durationDelta;
   } while (Math.abs(avgPre - myPre) >= 0.1);
-  const err: [IMaterial[], IPotentiality[]] = [
-    [{ start: -1, end: -1, materialId: toPlace.potentialId, queryId: toPlace.queryId }],
-    pots,
-  ];
-  if (!materials.length || validatePotentials(pots)) {
+  const err: [IMaterial[], IPotentiality[]] = [[], pots];
+  if (!materials.length || !validatePotentials(pots)) {
     error$.next(new ConflictError(toPlace.queryId)); // Throw pots with pressure > 1
+    return err;
   }
-  return !materials.length ? err : validatePotentials(pots) ? [materials, pots] : err;
-
-  // throwIfInvalidPots(toPlace)(pots);
-  // if (!materials.length) {
-  //   throw new ConflictError(toPlace.queryId);
-  // }
+  return [materials, pots];
 };
 
 export const materializePotentiality = (
@@ -160,10 +153,7 @@ export const materializePotentiality = (
   const maxMaterials = simulatePlacement(potToSimul('target', toPlace), pressure);
   if (!minMaterials.length && !maxMaterials.length) {
     error$.next(new ConflictError(toPlace.queryId));
-    return [
-      [{ start: -1, end: -1, materialId: toPlace.potentialId, queryId: toPlace.queryId }],
-      updatePP([]),
-    ];
+    return [[], updatePP([])];
   }
   const minPots = updatePP(minMaterials);
   const maxPots = updatePP(maxMaterials);
@@ -177,10 +167,7 @@ export const materializePotentiality = (
       return [maxMaterials, maxPots];
     }
     error$.next(new ConflictError(toPlace.queryId)); // use pots with > 1 pressure
-    return [
-      [{ start: -1, end: -1, materialId: toPlace.potentialId, queryId: toPlace.queryId }],
-      updatePP([]),
-    ];
+    return [[], updatePP([])];
   }
   return findMaxFinitePlacement(toPlace, updatePP, pressure, error$);
 };
@@ -337,11 +324,6 @@ const simulatePlacement = (
 };
 
 const validatePotentials = R.none(R.propSatisfies(p => p > 1, 'pressure'));
-// const throwIfInvalid = (validator: (d: any) => boolean) => (toPlace: IPotentiality) =>
-//   R.unless(validator, () => {
-//     throw new ConflictError(toPlace.queryId);
-//   });
-// const throwIfInvalidPots = throwIfInvalid(validatePotentials);
 
 const potentialsToMeanPressure = R.pipe(
   (pots: IPotentiality[]) =>

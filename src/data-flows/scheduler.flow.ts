@@ -47,12 +47,16 @@ export const queriesToPipeline$ = (config: IConfig) => (stateManager: stateManag
 ): Observable<ReadonlyArray<IMaterial>> => {
   return Observable.forkJoin(queriesToPipelineDebug$(config, false)(stateManager)(queries)).pipe(
     map((values: any) => {
-      if (values[0].length > 0) {
-        throw new values[0]();
+      if (values[0] != null) {
+        throw valueToError(values);
       }
       return values[2];
     })
   );
+};
+
+const valueToError = (values: any) => {
+  return new Error(`${values[0]}`);
 };
 
 export type stateManagerType = (
@@ -114,8 +118,8 @@ export const combineSchedulerObservables = (
   return Observable.combineLatest(bs);
 };
 
-const closeAllBS = (...toClose: Array<BehaviorSubject<any> | undefined>) => (): void => {
-  toClose.forEach(bs => (bs ? bs.complete() : null));
+const closeAllBS = (...toClose: Array<BehaviorSubject<any>>) => (): void => {
+  toClose.forEach(bs => bs.complete());
 };
 
 const testWorkers = (toClose: () => void) => (workStatus: boolean[]): void => {
@@ -205,10 +209,6 @@ const buildPotentials = (
       return userstateMask;
     } catch (e) {
       error$.next(e);
-      // if (!errorDebug) {
-      //   throw e;
-      // }
-      // errorDebug.next(e);
       return [{ start: -2, end: -2 }];
     }
   };
@@ -217,7 +217,11 @@ const buildPotentials = (
     queriesToPotentialities(config, queries, potentials, newUserstateHandler),
     materials
   );
-  replacePotsFn(result);
+  const filteredResult = result.filter(pot => pot.places.length);
+  if (result.length === filteredResult.length) {
+    error$.next(null);
+  }
+  replacePotsFn(filteredResult);
 };
 
 const queriesToPotentialities = (
@@ -245,7 +249,7 @@ const replacePotentials = (potentials$: BehaviorSubject<ReadonlyArray<IPotential
 const addMaterials = (materials$: BehaviorSubject<ReadonlyArray<IMaterial>>) => (
   materials: ReadonlyArray<IMaterial>
 ): void => {
-  materials$.next([/*...materials$.value, */ ...materials]);
+  materials$.next([...materials]);
 };
 
 const queryToPotentiality = (config: IConfig) => (query: IQuery) => {
@@ -282,13 +286,6 @@ const emitPressureChunks = (
   pressureChunk$.next(pressureChunk);
   return pressureChunk;
 };
-
-// const getErrorMaterial = (toPlace: IPotentiality): IMaterial => ({
-//   end: -1,
-//   materialId: toPlace.potentialId,
-//   queryId: toPlace.queryId,
-//   start: -1,
-// });
 
 const queryToMask = R.curry((config: IConfig, query: IQuery): IRange[] => {
   if (isGoalQuery(query) || isProviderQuery(query)) {

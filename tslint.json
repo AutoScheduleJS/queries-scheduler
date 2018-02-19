@@ -8,7 +8,7 @@
     "rules": {
       "no-implicit-dependencies": [true, "dev"],
       "no-submodule-imports": [true, "rxjs"],
-      "no-console":true
+      "no-console": true
     },
     "rulesDirectory": []
 }

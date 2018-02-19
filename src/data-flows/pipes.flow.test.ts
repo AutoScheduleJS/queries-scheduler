@@ -5,10 +5,9 @@ import { BehaviorSubject } from 'rxjs/BehaviorSubject';
 import { Observable } from 'rxjs/Observable';
 
 import 'rxjs/add/observable/zip';
-import { map } from 'rxjs/operators';
+import { first, map } from 'rxjs/operators';
 
 import { IConfig } from '../data-structures/config.interface';
-// import { ConflictError } from '../data-structures/conflict.error';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
 import { IRange } from '../data-structures/range.interface';
@@ -177,7 +176,7 @@ test('materialize will throw if no place available', t => {
     pChunks2,
     errors2
   );
-  return Observable.zip(errors1, errors2).pipe(map(vals => t.pass('should have errors')));
+  return Observable.zip(errors1, errors2).pipe(map(vals => t.pass('should have errors')), first());
 });
 
 test('materialize will throw if not placable without conflict', t => {

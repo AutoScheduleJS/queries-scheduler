@@ -2,10 +2,11 @@ import * as Q from '@autoschedule/queries-fn';
 import { queryToStatePotentials } from '@autoschedule/userstate-manager';
 import test from 'ava';
 import * as moment from 'moment';
+import 'rxjs/add/observable/empty';
 import 'rxjs/add/observable/forkJoin';
 import 'rxjs/add/observable/of';
 import { Observable } from 'rxjs/Observable';
-import { distinctUntilChanged, map, takeLast } from 'rxjs/operators';
+import { catchError, distinctUntilChanged, map, takeLast } from 'rxjs/operators';
 
 import {
   combineSchedulerObservables,
@@ -102,17 +103,13 @@ test('will throw ConflictError when conflict found', t => {
     Q.queryFactory(Q.id(1), Q.name('atomic 1'), Q.start(atomicStart), Q.end(atomicEnd)),
     Q.queryFactory(Q.id(2), Q.name('atomic 2'), Q.start(atomicStart), Q.end(atomicEnd + 10)),
   ];
-  try {
-    queriesToPipeline$(config)(stateManager)(queries).subscribe(
-      e => t.fail('should not pass'),
-      e => t.fail('should fail through exception')
-    );
-  } catch (e) {
-    t.true(e instanceof ConflictError);
-    const err = e as ConflictError;
-    t.is(err.victim, 1);
-    t.is(err.materials.length, 0);
-  }
+  return queriesToPipeline$(config)(stateManager)(queries).pipe(
+    catchError(e => {
+      t.pass();
+      return Observable.empty();
+    }),
+    map(_ => t.fail('should not pass'))
+  );
 });
 
 test('will schedule one atomic goal query', t => {
@@ -161,7 +158,7 @@ test('will schedule one splittable goal with one atomic', t => {
 
 test('will find space where resource is available from material', t => {
   const config: IConfig = { endDate: 100, startDate: 0 };
-  const query = Q.queryFactory(
+  const consumer = Q.queryFactory(
     Q.duration(Q.timeDuration(1)),
     Q.transforms([Q.need(true, 'test', { response: 42 }, 1)], [], [])
   );
@@ -170,7 +167,7 @@ test('will find space where resource is available from material', t => {
     Q.duration(Q.timeDuration(1)),
     Q.transforms([], [], [{ collectionName: 'test', doc: { response: 42 } }])
   );
-  return queriesToPipeline$(config)(stateManager)([query, provide]).pipe(
+  return queriesToPipeline$(config)(stateManager)([consumer, provide]).pipe(
     map(result => {
       t.is(result.length, 2);
       t.true(result[0].start === 0);
@@ -191,14 +188,14 @@ test('will emit error from userstate', t => {
       Q.transforms([Q.need(true)], [], [])
     ),
   ];
-  try {
-    queriesToPipeline$(config)(stateManager)(queries).subscribe(
-      e => t.fail('should not pass'),
-      e => t.fail('should fail through exception')
-    );
-  } catch (e) {
-    t.pass('should emit errors');
-  }
+
+  return queriesToPipeline$(config)(stateManager)(queries).pipe(
+    catchError(_ => {
+      t.pass();
+      return Observable.empty();
+    }),
+    map(_ => t.fail())
+  );
 });
 
 test('debug version will emit errors and close stream', t => {
