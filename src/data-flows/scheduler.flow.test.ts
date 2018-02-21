@@ -178,6 +178,17 @@ test('will find space where resource is available from material', t => {
   );
 });
 
+test.only('will stabilize with timeDuration', t => {
+  const config: IConfig = { endDate: 100, startDate: 0 };
+  const query1 = Q.queryFactory(Q.start(3), Q.end(5), Q.id(1), Q.duration(Q.timeDuration(4, 2)));
+  const query2 = Q.queryFactory(Q.duration(Q.timeDuration(4, 2)), Q.id(2));
+  return queriesToPipeline$(config)(stateManager)([query1, query2]).pipe(
+    map(result => {
+      t.is(result.length, 2);
+    })
+  );
+});
+
 test('provider will wait consumer', t => {
   const config: IConfig = { endDate: 100, startDate: 0 };
   const consumer = Q.queryFactory(
