@@ -172,19 +172,22 @@ test('will find space where resource is available from material', t => {
       t.is(result.length, 2);
       t.true(result[0].start === 0);
       t.true(result[0].end === 1);
-      t.true(result[1].start === 99);
-      t.true(result[1].end === 100);
+      t.true(result[1].start === 1);
+      t.true(result[1].end === 2);
     })
   );
 });
 
-test.only('will stabilize with timeDuration', t => {
+test('will stabilize with timeDuration', t => {
   const config: IConfig = { endDate: 100, startDate: 0 };
   const query1 = Q.queryFactory(Q.start(3), Q.end(5), Q.id(1), Q.duration(Q.timeDuration(4, 2)));
   const query2 = Q.queryFactory(Q.duration(Q.timeDuration(4, 2)), Q.id(2));
   return queriesToPipeline$(config)(stateManager)([query1, query2]).pipe(
     map(result => {
       t.is(result.length, 2);
+      t.is(result[0].start, 3);
+      t.is(result[0].end, 5);
+      t.is(result[1].end - result[1].start, 4);
     })
   );
 });

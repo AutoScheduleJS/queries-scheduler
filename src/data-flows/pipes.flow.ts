@@ -114,6 +114,24 @@ export const updatePotentialsPressureFromMats = (
   );
 };
 
+const fillLimitedArray = <T>(limit: number) => (arr: T[], value: T): T[] => {
+  return arr.length < limit ? [...arr, value] : [...R.drop(1, arr), value];
+};
+
+const continueProgress = (progress: number[]): boolean => {
+  return (
+    !R.reduceWhile(
+      ({ similar, value }, cur) => similar,
+      ({ similar, value }, cur) => ({ similar: similar && Object.is(value, cur), value: cur }),
+      { similar: true, value: progress[0] },
+      progress
+    ).similar && (R.last(progress) || 1) > 0.1
+  );
+};
+
+const maxPlaceAvailable = (pot: IPotentiality) =>
+  pot.places.map(place => place.end - place.start).reduce(R.max, 0);
+
 const findMaxFinitePlacement = (
   toPlace: IPotentiality,
   updatePP: (m: IMaterial[]) => IPotentiality[],
@@ -121,8 +139,12 @@ const findMaxFinitePlacement = (
   error$: BehaviorSubject<any>
 ): [IMaterial[], IPotentiality[]] => {
   const minDur = toPlace.duration.min;
+  const fillArray = fillLimitedArray<number>(3);
+  const maxTest = maxPlaceAvailable(toPlace);
+  const minTestDur = (dur: number) => Math.min(dur, maxTest);
+  let lastProgress: number[] = [];
   let durationDelta = toPlace.duration.target - minDur;
-  let testDuration = minDur + durationDelta / 2;
+  let testDuration = minTestDur(minDur + durationDelta / 2);
   let avgPre: number = 0;
   let myPre: number = 0;
   let materials: IMaterial[] = [];
@@ -133,14 +155,21 @@ const findMaxFinitePlacement = (
     avgPre = potentialsToMeanPressure(pots);
     myPre = computePressureWithSpace(toPlace, testDuration);
     durationDelta /= 2;
-    testDuration = avgPre > myPre ? testDuration - durationDelta : testDuration + durationDelta;
-  } while (Math.abs(avgPre - myPre) >= 0.1);
+    testDuration = minTestDur(
+      avgPre > myPre ? testDuration - durationDelta : testDuration + durationDelta
+    );
+    lastProgress = fillArray(lastProgress, Math.abs(avgPre - myPre));
+  } while (continueProgress(lastProgress));
   const err: [IMaterial[], IPotentiality[]] = [[], pots];
   if (!materials.length || !validatePotentials(pots)) {
     error$.next(new ConflictError(toPlace.queryId)); // Throw pots with pressure > 1
     return err;
   }
   return [materials, pots];
+};
+
+const areSameNumber = (minDiff: number) => (avg1: number, avg2: number): boolean => {
+  return Object.is(avg1, avg2) || Math.abs(avg1 - avg2) < minDiff;
 };
 
 export const materializePotentiality = (
@@ -159,10 +188,7 @@ export const materializePotentiality = (
   const maxPots = updatePP(maxMaterials);
   const minAvg = potentialsToMeanPressure(minPots);
   const maxAvg = potentialsToMeanPressure(maxPots);
-  if (
-    maxMaterials.length &&
-    (minAvg === maxAvg || (Number.isNaN(minAvg) && Number.isNaN(maxAvg)))
-  ) {
+  if (maxMaterials.length && areSameNumber(0.1)(minAvg, maxAvg)) {
     if (validatePotentials(minPots)) {
       return [maxMaterials, maxPots];
     }
@@ -188,7 +214,7 @@ const rangeToDuration = (range: IRange): number => {
 };
 const firstTimeRange = (ranges: IRange[]): number => ranges[0].start;
 const lastTimeRange = (ranges: IRange[]): number => ranges[ranges.length - 1].end;
-const scanPressure = (acc: IPressureChunk, curr: IPressureChunk) => ({
+const scanPressure = (acc: IPressureChunk, curr: IPressureChunk): IPressureChunk => ({
   ...acc,
   pressure: getProportionalPressure(
     acc.end - acc.start,
@@ -229,29 +255,10 @@ const computeContiguousPressureChunk = (
 const findBestContiguousChunk = (
   toPlace: IPotentialitySimul,
   chunks: IPressureChunk[]
-): IPressureChunk | undefined => {
-  const during = sortByPressure(chunks).find(chunk => toPlace.places.some(isDuring(chunk)));
-  if (during) {
-    return during;
-  }
-  const between = sortByPressure(
-    R.unnest(
-      R.aperture(2, chunks)
-        .filter((_, i) => i % 2 === 0)
-        .filter(chunkPair => chunkPair[0].end < chunkPair[1].start)
-        .filter(chunkPair =>
-          toPlace.places.some(p => isDuring(p, [chunkPair[0].end, chunkPair[1].start]))
-        )
-        .map(chunkPair =>
-          intersect(toPlace.places, {
-            end: chunkPair[1].start,
-            pressure: chunkPair[0].pressure,
-            start: chunkPair[0].end,
-          })
-        )
-    )
-  );
-  return R.head(between);
+): IPressureChunk => {
+  return sortByPressure(chunks).find(chunk =>
+    toPlace.places.some(isDuring(chunk))
+  ) as IPressureChunk;
 };
 
 const rangeToMaterial = (toPlace: IPotentialityBase, chunk: IRange): IMaterial => {
@@ -281,9 +288,6 @@ const placeAtomic = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]): I
     return [];
   }
   const bestChunk = findBestContiguousChunk(toPlace, chunks);
-  if (!bestChunk) {
-    return [];
-  }
   return [rangeToMaterial(toPlace, minimizeChunkToDuration(bestChunk, toPlace.duration))];
 };
 
@@ -305,10 +309,7 @@ const placeSplittableUnfold = (
 };
 
 const placeSplittable = (toPlace: IPotentialitySimul, pressure: IPressureChunk[]): IMaterial[] => {
-  const sortedChunks = sortByPressure(
-    intersect(toPlace.places, pressure.filter(isOverlapping(toPlace.places)))
-  );
-  return R.unfold(R.partial(placeSplittableUnfold, [toPlace]), [0, sortedChunks]).map(
+  return R.unfold(R.partial(placeSplittableUnfold, [toPlace]), [0, pressure]).map(
     (material, i) => ({ ...material, splitId: i })
   );
 };
@@ -317,17 +318,19 @@ const simulatePlacement = (
   toPlace: IPotentialitySimul,
   pressure: IPressureChunk[]
 ): IMaterial[] => {
+  const sortedChunks = sortByPressure(
+    intersect(toPlace.places, pressure.filter(isOverlapping(toPlace.places)))
+  );
   if (!toPlace.isSplittable) {
-    return placeAtomic(toPlace, pressure);
+    return placeAtomic(toPlace, sortedChunks);
   }
-  return placeSplittable(toPlace, pressure);
+  return placeSplittable(toPlace, sortedChunks);
 };
 
 const validatePotentials = R.none(R.propSatisfies(p => p > 1, 'pressure'));
 
 const potentialsToMeanPressure = R.pipe(
-  (pots: IPotentiality[]) =>
-    pots.map(R.pipe(R.pathOr(0, ['pressure']) as (n: IPotentiality) => number, R.max(1))), // Workaround for npm-ramda issue #311
+  (pots: IPotentiality[]) => pots.map(R.pathOr(0, ['pressure']) as (n: IPotentiality) => number), // Workaround for npm-ramda issue #311
   R.mean
 );
 
