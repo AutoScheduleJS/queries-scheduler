@@ -212,6 +212,31 @@ test('provider will wait consumer', t => {
   );
 });
 
+test.failing('provider will wait consumer which have Q.duration', t => {
+  const config: IConfig = { endDate: 50, startDate: 0 };
+  const queries: Q.IQuery[] = [
+    Q.queryFactory(
+      Q.id(1),
+      Q.name('consumer'),
+      Q.start(45),
+      Q.end(49),
+      Q.duration(Q.timeDuration(4, 2)),
+      Q.transforms([Q.need(false, 'col', { test: 'toto' }, 1, '1')], [], [])
+    ),
+    Q.queryFactory(
+      Q.id(2),
+      Q.name('provider'),
+      Q.duration(Q.timeDuration(4, 2)),
+      Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'toto' }, wait: true }])
+    ),
+  ];
+  return queriesToPipeline$(config)(stateManager)(queries).pipe(
+    map(result => {
+      t.is(result.length, 2);
+    })
+  );
+});
+
 test('provider will error when impossible to place', t => {
   const config: IConfig = { endDate: 100, startDate: 0 };
   const consumer = Q.queryFactory(

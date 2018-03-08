@@ -8,6 +8,7 @@
     {
       "type": "node",
       "request": "launch",
+      "preLaunchTask": "tsc",
       "name": "Run main AVA tests",
       "program": "${workspaceRoot}/node_modules/ava/profile.js",
       "args": [
@@ -17,6 +18,7 @@
     {
       "type": "node",
       "request": "launch",
+      "preLaunchTask": "tsc",
       "name": "Run scheduler AVA tests",
       "program": "${workspaceRoot}/node_modules/ava/profile.js",
       "args": [
@@ -26,6 +28,7 @@
     {
       "type": "node",
       "request": "launch",
+      "preLaunchTask": "tsc",
       "name": "Run pipes AVA tests",
       "program": "${workspaceRoot}/node_modules/ava/profile.js",
       "args": [
