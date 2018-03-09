@@ -120,12 +120,14 @@ const fillLimitedArray = <T>(limit: number) => (arr: T[], value: T): T[] => {
 
 const continueProgress = (progress: number[]): boolean => {
   return (
-    !R.reduceWhile(
-      ({ similar, value }, cur) => similar,
-      ({ similar, value }, cur) => ({ similar: similar && Object.is(value, cur), value: cur }),
-      { similar: true, value: progress[0] },
-      progress
-    ).similar && (R.last(progress) || 1) > 0.1
+    (progress.length === 1 ||
+      !R.reduceWhile(
+        ({ similar, value }, cur) => similar,
+        ({ similar, value }, cur) => ({ similar: similar && Object.is(value, cur), value: cur }),
+        { similar: true, value: progress[0] },
+        progress
+      ).similar) &&
+    (R.last(progress) as number) > 0.1
   );
 };
 
@@ -212,16 +214,19 @@ const getProportionalPressure = (
 const rangeToDuration = (range: IRange): number => {
   return range.end - range.start;
 };
-const firstTimeRange = (ranges: IRange[]): number => ranges[0].start;
-const lastTimeRange = (ranges: IRange[]): number => ranges[ranges.length - 1].end;
+const firstTimeRange = (ranges: IRange[]): number =>
+  ranges.reduce((a, b) => (b.start < a ? b.start : a), Infinity);
+const lastTimeRange = (ranges: IRange[]): number =>
+  ranges.reduce((a, b) => (b.end > a ? b.end : a), -Infinity);
 const scanPressure = (acc: IPressureChunk, curr: IPressureChunk): IPressureChunk => ({
-  ...acc,
+  end: lastTimeRange([acc, curr]),
   pressure: getProportionalPressure(
     acc.end - acc.start,
     acc.pressure,
     curr.end - curr.start,
     curr.pressure
   ),
+  start: firstTimeRange([acc, curr]),
 });
 
 const divideChunkByDuration = (duration: number) => (chunk: IPressureChunk): IRange[] => {
@@ -233,7 +238,7 @@ const divideChunkByDuration = (duration: number) => (chunk: IPressureChunk): IRa
 
 const rangeChunkIntersectin = (duration: number, chunks: IPressureChunk[]) => (range: IRange) => {
   const inter = intersect(range, chunks);
-  if (!inter.length || inter[0].end - inter[0].start < duration) {
+  if (!inter.length) {
     return null;
   }
   return inter.reduce(scanPressure);
@@ -249,7 +254,7 @@ const computeContiguousPressureChunk = (
   return R.unnest(chunks.map(divideChunkByDuration(duration)))
     .filter(c => c.start >= firstTimeRange(chunks) && c.end <= lastTimeRange(chunks))
     .map(rangeChunkIntersectin(duration, chunks))
-    .filter(p => p != null) as IPressureChunk[];
+    .filter(p => p != null && p.end - p.start >= duration) as IPressureChunk[];
 };
 
 const findBestContiguousChunk = (

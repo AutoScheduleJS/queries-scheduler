@@ -70,8 +70,8 @@ test('will compute simple pressure chunks', t => {
 test('will simplify pressure chunks', t => {
   const config: IConfig = { startDate: 0, endDate: 10 };
   const pChunkA = computePressureChunks(config, [
-    potentialFactory({ min: 0, target: 1 }, [{ end: 2, start: 1 }], 0.5),
-    potentialFactory({ min: 2, target: 2 }, [{ end: 3, start: 1 }], 1),
+    potentialFactory({ min: 0, target: 1 }, [{ end: 2, start: 1 }], 0.5, 1),
+    potentialFactory({ min: 2, target: 2 }, [{ end: 3, start: 1 }], 1, 2),
   ]);
   t.is(pChunkA.length, 4);
   t.is(isEqual({ start: 0, end: 1 }, pChunkA[0]) && pChunkA[0].pressure, 0);
@@ -80,7 +80,7 @@ test('will simplify pressure chunks', t => {
   t.is(isEqual({ start: 3, end: 10 }, pChunkA[3]) && pChunkA[3].pressure, 0);
 
   const pChunkB = computePressureChunks(config, [
-    potentialFactory({ min: 5, target: 10 }, [{ end: 10, start: 0 }], 0.75),
+    potentialFactory({ min: 5, target: 10 }, [{ end: 10, start: 0 }], 0.75, 3),
   ]);
   t.is(pChunkB.length, 1);
   t.is(isEqual({ start: 0, end: 10 }, pChunkB[0]) && pChunkB[0].pressure, 0.75);
@@ -94,10 +94,10 @@ test('will update potentials pressure', t => {
 });
 
 test('will materialize atomic potentiality', t => {
-  const toPlace = potentialFactory({ min: 1, target: 1 }, [{ end: 10, start: 0 }], 0.1);
+  const toPlace = potentialFactory({ min: 1, target: 1 }, [{ end: 10, start: 0 }], 0.1, 1);
   const pots = [
-    potentialFactory({ min: 5, target: 5 }, [{ end: 5, start: 0 }], 1),
-    potentialFactory({ min: 4, target: 4 }, [{ end: 10, start: 6 }], 1),
+    potentialFactory({ min: 5, target: 5 }, [{ end: 5, start: 0 }], 1, 2),
+    potentialFactory({ min: 4, target: 4 }, [{ end: 10, start: 6 }], 1, 3),
   ];
   const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, pots);
   const materials = materializePotentiality(
@@ -140,7 +140,7 @@ test('will materialize without concurrent potentials', t => {
 
 test('will materialize splittable potentiality', t => {
   const toPlace: IPotentiality = {
-    ...potentialFactory({ min: 1, target: 9 }, [{ end: 10, start: 0 }], 0.6),
+    ...potentialFactory({ min: 1, target: 9 }, [{ end: 10, start: 0 }], 0.6, 42),
     isSplittable: true,
   };
   const pots = [potentialFactory({ min: 5, target: 5 }, [{ end: 8, start: 3 }], 1, 66)];
@@ -180,10 +180,10 @@ test('materialize will throw if no place available', t => {
 });
 
 test('materialize will throw if not placable without conflict', t => {
-  const toPlace = potentialFactory({ min: 5, target: 10 }, [{ end: 10, start: 0 }], 0.6);
+  const toPlace = potentialFactory({ min: 5, target: 10 }, [{ end: 10, start: 0 }], 0.6, 1);
   const pots = [
-    potentialFactory({ min: 5, target: 5 }, [{ end: 5, start: 0 }], 0.5),
-    potentialFactory({ min: 4, target: 4 }, [{ end: 10, start: 6 }], 0.65),
+    potentialFactory({ min: 5, target: 5 }, [{ end: 5, start: 0 }], 0.5, 2),
+    potentialFactory({ min: 4, target: 4 }, [{ end: 10, start: 6 }], 0.65, 3),
   ];
   const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, pots);
   t.throws(

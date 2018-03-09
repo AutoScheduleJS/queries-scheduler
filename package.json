@@ -37,7 +37,7 @@
   "dependencies": {},
   "devDependencies": {
     "@autoschedule/queries-fn": "^4.1.1",
-    "@autoschedule/userstate-manager": "^2.0.1",
+    "@autoschedule/userstate-manager": "^2.0.2",
     "@semantic-release/release-notes-generator": "^6.0.3",
     "@types/ramda": "github:types/npm-ramda#dist",
     "ava": "^0.25.0",

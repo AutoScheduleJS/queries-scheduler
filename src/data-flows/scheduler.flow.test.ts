@@ -212,7 +212,7 @@ test('provider will wait consumer', t => {
   );
 });
 
-test.failing('provider will wait consumer which have Q.duration', t => {
+test('provider will wait consumer which have Q.duration', t => {
   const config: IConfig = { endDate: 50, startDate: 0 };
   const queries: Q.IQuery[] = [
     Q.queryFactory(
