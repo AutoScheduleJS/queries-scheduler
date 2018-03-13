@@ -81,8 +81,9 @@ const potentialsToPressurePoint = (potentialities: IPotentiality[]): IPressurePo
   );
 };
 
-export const updatePotentialsPressureFromPots = (
+export const updatePotentialsPressure = (
   potentialities: IPotentiality[],
+  materials: ReadonlyArray<IMaterial>,
   ...masks: IRange[][]
 ): IPotentiality[] => {
   return potentialities.map(
@@ -91,22 +92,11 @@ export const updatePotentialsPressureFromPots = (
         ...p,
         places: masks.reduce((a, b) => intersect(a, b), p.places),
       }),
-      (p: IPotentiality) => ({ ...p, pressure: computePressure(p) })
-    )
-  );
-};
-
-export const updatePotentialsPressureFromMats = (
-  potentialities: ReadonlyArray<IPotentiality>,
-  masks: ReadonlyArray<IMaterial>
-): IPotentiality[] => {
-  return potentialities.map(
-    R.pipe(
       (p: IPotentiality) => ({
         ...p,
         places: substract(
           p.places,
-          masks.filter(m => m.queryId !== p.queryId || m.materialId !== p.potentialId)
+          materials.filter(m => m.queryId !== p.queryId || m.materialId !== p.potentialId)
         ),
       }),
       (p: IPotentiality) => ({ ...p, pressure: computePressure(p) })
@@ -139,7 +129,7 @@ const findMaxFinitePlacement = (
   updatePP: (m: IMaterial[]) => IPotentiality[],
   pressure: IPressureChunk[],
   error$: BehaviorSubject<any>
-): [IMaterial[], IPotentiality[]] => {
+): IMaterial[] => {
   const minDur = toPlace.duration.min;
   const fillArray = fillLimitedArray<number>(3);
   const maxTest = maxPlaceAvailable(toPlace);
@@ -162,12 +152,12 @@ const findMaxFinitePlacement = (
     );
     lastProgress = fillArray(lastProgress, Math.abs(avgPre - myPre));
   } while (continueProgress(lastProgress));
-  const err: [IMaterial[], IPotentiality[]] = [[], pots];
+  const err: IMaterial[] = [];
   if (!materials.length || !validatePotentials(pots)) {
     error$.next(new ConflictError(toPlace.queryId)); // Throw pots with pressure > 1
     return err;
   }
-  return [materials, pots];
+  return materials;
 };
 
 const areSameNumber = (minDiff: number) => (avg1: number, avg2: number): boolean => {
@@ -179,12 +169,12 @@ export const materializePotentiality = (
   updatePP: (m: IMaterial[]) => IPotentiality[],
   pressure: IPressureChunk[],
   error$: BehaviorSubject<any>
-): [IMaterial[], IPotentiality[]] => {
+): IMaterial[] => {
   const minMaterials = simulatePlacement(potToSimul('min', toPlace), pressure);
   const maxMaterials = simulatePlacement(potToSimul('target', toPlace), pressure);
   if (!minMaterials.length && !maxMaterials.length) {
     error$.next(new ConflictError(toPlace.queryId));
-    return [[], updatePP([])];
+    return [];
   }
   const minPots = updatePP(minMaterials);
   const maxPots = updatePP(maxMaterials);
@@ -192,10 +182,10 @@ export const materializePotentiality = (
   const maxAvg = potentialsToMeanPressure(maxPots);
   if (maxMaterials.length && areSameNumber(0.1)(minAvg, maxAvg)) {
     if (validatePotentials(minPots)) {
-      return [maxMaterials, maxPots];
+      return maxMaterials;
     }
     error$.next(new ConflictError(toPlace.queryId)); // use pots with > 1 pressure
-    return [[], updatePP([])];
+    return [];
   }
   return findMaxFinitePlacement(toPlace, updatePP, pressure, error$);
 };
