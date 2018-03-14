@@ -359,26 +359,26 @@ test('debug version will emit intermediate results', t => {
         t.is(result[2], null);
       } else if (lap === 3) {
         t.is(result[0], null);
-        t.is(result[1].length, 2);
+        t.is(result[1].length, 1);
         t.is(result[2], null);
       } else if (lap === 4) {
         t.is(result[0], null);
-        t.is(result[1].length, 2);
-        t.is(result[2].length, 0);
+        t.is(result[1].length, 0);
+        t.is(result[2], null);
       } else if (lap === 5) {
         t.is(result[0], null);
-        t.is(result[1].length, 2);
-        t.is(result[2].length, 2);
+        t.is(result[1].length, 0);
+        t.is(result[2].length, 0);
       } else if (lap === 6) {
         t.is(result[0], null);
-        t.is(result[1].length, 2);
-        t.is(result[2].length, 2);
-        t.is(result[3].length, 0);
+        t.is(result[1].length, 0);
+        t.is(result[2].length, 1);
+        t.is(result[3], null);
       } else if (lap === 7) {
         t.is(result[0], null);
-        t.is(result[1].length, 2);
+        t.is(result[1].length, 0);
         t.is(result[2].length, 2);
-        t.is(result[3].length, 1);
+        t.is(result[3], null);
       } else if (lap > 12) {
         t.fail();
       }
@@ -414,6 +414,41 @@ test('debug version will emit materials and potentials stream', t => {
       validateSE(t, mat[0], [+now, atomicStart], 2);
       validateSE(t, mat[1], [atomicStart, atomicEnd], 1);
       validateSE(t, mat[2], [atomicEnd, config.endDate], 2);
+    })
+  );
+});
+
+test('Will handle provider of provider', t => {
+  const config: IConfig = { endDate: 50, startDate: 0 };
+  const queries: Q.IQuery[] = [
+    Q.queryFactory(
+      Q.id(1),
+      Q.name('consumer'),
+      Q.start(45, 1),
+      Q.end(49, 5),
+      Q.duration(Q.timeDuration(4, 2)),
+      Q.transforms([Q.need(false, 'col', { test: 'toto' }, 1, '1')], [], [])
+    ),
+    Q.queryFactory(
+      Q.id(2),
+      Q.name('provide_toto'),
+      Q.duration(Q.timeDuration(4, 2)),
+      Q.transforms(
+        [Q.need(false, 'col', { test: 'tata' }, 1, '1')],
+        [],
+        [{ collectionName: 'col', doc: { test: 'toto' }, wait: true }]
+      )
+    ),
+    Q.queryFactory(
+      Q.id(3),
+      Q.name('provide_tata'),
+      Q.duration(Q.timeDuration(4, 2)),
+      Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'tata' }, wait: true }])
+    ),
+  ];
+  return queriesToPipeline$(config)(stateManager)(queries).pipe(
+    map(result => {
+      t.is(result.length, 3);
     })
   );
 });

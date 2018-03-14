@@ -19,8 +19,7 @@ import { Subject } from 'rxjs/Subject';
 import {
   computePressureChunks,
   materializePotentiality,
-  updatePotentialsPressureFromMats,
-  updatePotentialsPressureFromPots,
+  updatePotentialsPressure,
 } from '../data-flows/pipes.flow';
 import {
   atomicToPotentiality,
@@ -38,7 +37,7 @@ import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
 import { IRange } from '../data-structures/range.interface';
 
 const sortByStart = R.sortBy<IMaterial>(R.prop('start'));
-const getMax = <T>(prop: keyof T, list: T[]): T =>
+const getMax = <T>(prop: keyof T, list: ReadonlyArray<T>): T =>
   R.reduce(R.maxBy(R.prop(prop) as (n: any) => number), list[0], list);
 
 export const queriesToPipeline$ = (config: IConfig) => (stateManager: stateManagerType) => (
@@ -57,6 +56,9 @@ export const queriesToPipeline$ = (config: IConfig) => (stateManager: stateManag
 const valueToError = (values: any) => {
   return new Error(`${values[0]}`);
 };
+
+const takeLatestFromBS = <T, D>(bs: BehaviorSubject<D>) => (source: Observable<T>) =>
+  source.pipe(map(value => [value, bs.value] as [T, D]));
 
 export type stateManagerType = (
   c: IConfig
@@ -89,7 +91,7 @@ export const queriesToPipelineDebug$ = (config: IConfig, debug?: boolean) => (
   const pressureChunkDebug$ = pressureChunk$.pipe(publishReplay()) as ConnectableObservable<
     ReadonlyArray<IPressureChunk>
   >;
-  const userstateHandler = stateManager(config);
+  const userstateHandler = stateManager(config)([...queries]);
   const toClose = closeAllBS(potentialsBS$, materialsBS$, errorsBS$, pressureChunk$);
 
   potentialsDebug$.connect();
@@ -98,11 +100,20 @@ export const queriesToPipelineDebug$ = (config: IConfig, debug?: boolean) => (
 
   potentialsWorking$.pipe(combineLatest(materialsWorking$)).subscribe(testWorkers(toClose));
   Observable.combineLatest(potentialsOb$, materialsOb$).subscribe(
-    buildPotentials(config, replacePotentials(potentialsBS$), userstateHandler, queries, errorsBS$)
+    managePotentials(config, replacePotentials(potentialsBS$), userstateHandler, queries, errorsBS$)
   );
-  potentialsBS$.subscribe(
-    buildMaterials(config, addMaterials(materialsBS$), pressureChunk$, errorsBS$)
-  );
+  potentialsBS$
+    .pipe(takeLatestFromBS(materialsBS$))
+    .subscribe(
+      manageMaterials(
+        config,
+        addMaterials(materialsBS$),
+        pressureChunk$,
+        userstateHandler,
+        queries,
+        errorsBS$
+      )
+    );
   return [errorsBS$, potentialsDebug$, materialsDebug$, pressureChunkDebug$];
 };
 
@@ -146,6 +157,20 @@ const distinctMaterials$ = (
   );
 };
 
+const arePotentialitiesSimilar = (xa: IPotentiality) => (xb: IPotentiality): boolean => {
+  return (
+    xa.queryId === xb.queryId &&
+    xa.pressure === xb.pressure &&
+    xa.duration.min === xb.duration.min &&
+    xa.duration.target === xb.duration.target &&
+    xa.places.length === xb.places.length &&
+    xa.places.every((xaa, ii) => {
+      const xbb = xb.places[ii];
+      return xaa.start === xbb.start && xaa.end === xbb.end;
+    })
+  );
+};
+
 const distinctPotentials$ = (
   workingStatus$: Subject<boolean>,
   pots$: Observable<ReadonlyArray<IPotentiality>>
@@ -156,17 +181,7 @@ const distinctPotentials$ = (
         x.length === y.length &&
         x.every((xa, i) => {
           const xb = y[i];
-          return (
-            xa.queryId === xb.queryId &&
-            xa.pressure === xb.pressure &&
-            xa.duration.min === xb.duration.min &&
-            xa.duration.target === xb.duration.target &&
-            xa.places.length === xb.places.length &&
-            xa.places.every((xaa, ii) => {
-              const xbb = xb.places[ii];
-              return xaa.start === xbb.start && xaa.end === xbb.end;
-            })
-          );
+          return arePotentialitiesSimilar(xa)(xb);
         });
       workingStatus$.next(!isDistinct);
       return isDistinct;
@@ -174,50 +189,75 @@ const distinctPotentials$ = (
   );
 };
 
-const buildMaterials = (
+const manageMaterials = (
   config: IConfig,
-  replaceMatsFn: (mats: ReadonlyArray<IMaterial>) => void,
+  addMatsFn: (mats: ReadonlyArray<IMaterial>) => void,
   pressureChunk$: BehaviorSubject<ReadonlyArray<IPressureChunk>>,
+  userstateHandler: handleUserState,
+  queries: ReadonlyArray<IQuery>,
   error$: BehaviorSubject<any>
-) => (potentials: ReadonlyArray<IPotentiality>): void => {
-  const result = sortByStart(
-    R.unnest(R.unfold(R.partial(pipelineUnfolder, [config, pressureChunk$, error$]), potentials))
-  ) as IMaterial[];
-  replaceMatsFn(result);
+) => ([potentials, materials]: [ReadonlyArray<IPotentiality>, ReadonlyArray<IMaterial>]): void => {
+  const otherPots = potentials.filter(potIsNotPlaced(materials));
+  if (!otherPots.length) {
+    return addMatsFn([]);
+  }
+  const newUserstateHandler = buildUserstateHandler(userstateHandler);
+  const matPotentialsBuilder = queriesToPotentialities(config, queries, newUserstateHandler);
+  const toPlace = getMax('pressure', otherPots);
+  const newPotentials = R.without([toPlace], otherPots);
+  const result = materializePotentiality(
+    toPlace,
+    (mats: IMaterial[]) => {
+      const allMats = [...materials, ...mats];
+      return matPotentialsBuilder(newPotentials, allMats).filter(potIsNotPlaced(allMats));
+    },
+    emitPressureChunks(pressureChunk$, computePressureChunks(config, newPotentials)),
+    error$
+  );
+  addMatsFn(result);
 };
 
 type handleUserState = (
-  queries: IQuery[]
-) => (query: IQuery, potentials: IPotentiality[], materials: IMaterial[]) => IRange[];
+  query: IQuery,
+  potentials: IPotentiality[],
+  materials: IMaterial[]
+) => IRange[];
 
-const buildPotentials = (
+const potIsNotPlaced = (materials: ReadonlyArray<IMaterial>) => (potential: IPotentiality) =>
+  !materials.find(
+    mat => mat.queryId === potential.queryId && mat.materialId === potential.potentialId
+  );
+
+const buildUserstateHandler = (
+  userstateHandler: handleUserState,
+  error$?: BehaviorSubject<any>
+) => (query: IQuery, pots: ReadonlyArray<IPotentiality>, mats: ReadonlyArray<IMaterial>) => {
+  try {
+    const otherMats = mats.filter(mat => mat.queryId !== query.id);
+    const userstateMask = userstateHandler(query, [...pots], [...otherMats]);
+    return userstateMask;
+  } catch (e) {
+    if (error$) {
+      error$.next(e);
+    }
+    return [{ start: -2, end: -2 }];
+  }
+};
+
+const managePotentials = (
   config: IConfig,
   replacePotsFn: (pots: ReadonlyArray<IPotentiality>) => void,
   userstateHandler: handleUserState,
   queries: ReadonlyArray<IQuery>,
   error$: BehaviorSubject<any>
 ) => ([potentials, materials]: [ReadonlyArray<IPotentiality>, ReadonlyArray<IMaterial>]): void => {
-  const newUserstateHandler = (query: IQuery, pots: ReadonlyArray<IPotentiality>) => {
-    try {
-      const otherPots = pots.filter(
-        pot =>
-          !materials.find(mat => mat.queryId === pot.queryId && mat.materialId === pot.potentialId)
-      );
-      const otherMats = materials.filter(mat => mat.queryId !== query.id);
-      const userstateMask = userstateHandler([...queries])(query, [...otherPots], [...otherMats]);
-      return userstateMask;
-    } catch (e) {
-      error$.next(e);
-      return [{ start: -2, end: -2 }];
-    }
-  };
-
-  const result = updatePotentialsPressureFromMats(
-    queriesToPotentialities(config, queries, potentials, newUserstateHandler),
+  const newUserstateHandler = buildUserstateHandler(userstateHandler, error$);
+  const result = queriesToPotentialities(config, queries, newUserstateHandler)(
+    potentials.filter(potIsNotPlaced(materials)),
     materials
   );
-  const filteredResult = result.filter(pot => pot.places.length);
-  if (result.length === filteredResult.length) {
+  const filteredResult = result.filter(pot => pot.places.length && potIsNotPlaced(materials)(pot));
+  if (result.length === result.filter(pot => pot.places.length).length) {
     error$.next(null);
   }
   replacePotsFn(filteredResult);
@@ -226,15 +266,18 @@ const buildPotentials = (
 const queriesToPotentialities = (
   config: IConfig,
   queries: ReadonlyArray<IQuery>,
+  userstateHandler: handleUserState
+) => (
   potentials: ReadonlyArray<IPotentiality>,
-  userstateHandler: (q: IQuery, p: ReadonlyArray<IPotentiality>) => IRange[]
+  materials: ReadonlyArray<IMaterial>
 ): IPotentiality[] =>
   R.unnest(
     queries.map(
-      R.converge(updatePotentialsPressureFromPots, [
+      R.converge(updatePotentialsPressure, [
         queryToPotentiality(config),
+        () => materials,
         queryToMask(config),
-        (q: IQuery) => userstateHandler(q, potentials),
+        (q: IQuery) => userstateHandler(q, [...potentials], [...materials]),
       ])
     )
   );
@@ -248,7 +291,8 @@ const replacePotentials = (potentials$: BehaviorSubject<ReadonlyArray<IPotential
 const addMaterials = (materials$: BehaviorSubject<ReadonlyArray<IMaterial>>) => (
   materials: ReadonlyArray<IMaterial>
 ): void => {
-  materials$.next([...materials]);
+  const newMaterials = sortByStart([...materials$.value, ...materials]);
+  materials$.next(newMaterials);
 };
 
 const queryToPotentiality = (config: IConfig) => (query: IQuery) => {
@@ -256,26 +300,6 @@ const queryToPotentiality = (config: IConfig) => (query: IQuery) => {
     return goalToPotentiality(config)(query);
   }
   return atomicToPotentiality(config)(query);
-};
-
-const pipelineUnfolder = (
-  config: IConfig,
-  pressureChunk$: BehaviorSubject<ReadonlyArray<IPressureChunk>>,
-  error$: BehaviorSubject<any>,
-  potentials: IPotentiality[]
-): false | [IMaterial[], IPotentiality[]] => {
-  if (potentials.length < 1) {
-    return false;
-  }
-  const toPlace = getMax('pressure', potentials);
-  const newPotentials = R.without([toPlace], potentials);
-  const result = materializePotentiality(
-    toPlace,
-    R.partial(updatePotentialsPressureFromMats, [newPotentials]),
-    emitPressureChunks(pressureChunk$, computePressureChunks(config, newPotentials)),
-    error$
-  );
-  return result;
 };
 
 const emitPressureChunks = (

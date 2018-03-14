@@ -16,8 +16,7 @@ import {
   computePressure,
   computePressureChunks,
   materializePotentiality,
-  updatePotentialsPressureFromMats,
-  updatePotentialsPressureFromPots,
+  updatePotentialsPressure,
 } from './pipes.flow';
 
 const potentialFactory = (
@@ -35,6 +34,9 @@ const potentialFactory = (
     queryId,
   };
 };
+
+const updatePotentialsPressureFromMats = (pots: IPotentiality[]) => (materials: any) =>
+  updatePotentialsPressure(pots, materials);
 
 test('will compute pressure', t => {
   t.is(computePressure(potentialFactory({ min: 1, target: 1 }, [{ end: 1, start: 0 }])), 1);
@@ -88,7 +90,7 @@ test('will simplify pressure chunks', t => {
 
 test('will update potentials pressure', t => {
   const pots = [potentialFactory({ min: 2, target: 2 }, [{ end: 2, start: 0 }], 1)];
-  const updated = updatePotentialsPressureFromPots(pots, [{ end: 1, start: 0 }]);
+  const updated = updatePotentialsPressure(pots, [], [{ end: 1, start: 0 }]);
   t.is(updated.length, 1);
   t.is(updated[0].pressure, 2);
 });
@@ -105,7 +107,7 @@ test('will materialize atomic potentiality', t => {
     () => pots,
     pChunks,
     new BehaviorSubject(null)
-  )[0];
+  );
   t.is(materials.length, 1);
   t.true(materials[0].start === 5 && materials[0].end === 6);
 });
@@ -118,7 +120,7 @@ test('will materialize atomic within big chunk', t => {
     () => [],
     pChunks,
     new BehaviorSubject(null)
-  )[0];
+  );
   t.is(materials.length, 1);
   t.is(materials[0].start, 4);
   t.is(materials[0].end, 5);
@@ -132,7 +134,7 @@ test('will materialize without concurrent potentials', t => {
     () => [],
     pChunks,
     new BehaviorSubject(null)
-  )[0];
+  );
   t.is(materials.length, 1);
   t.is(materials[0].start, 0);
   t.is(materials[0].end, 1);
@@ -147,10 +149,10 @@ test('will materialize splittable potentiality', t => {
   const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, pots);
   const materials = materializePotentiality(
     toPlace,
-    updatePotentialsPressureFromMats.bind(null, pots),
+    updatePotentialsPressureFromMats(pots),
     pChunks,
     new BehaviorSubject(null)
-  )[0];
+  );
   t.is(materials.length, 2);
   t.true(materials[0].start === 0 && materials[0].end === 3);
   t.true(materials[1].start === 8 && materials[1].end === 10);
@@ -163,19 +165,9 @@ test('materialize will throw if no place available', t => {
   const errors1 = new BehaviorSubject(null);
   const errors2 = new BehaviorSubject(null);
 
-  materializePotentiality(
-    toPlace,
-    updatePotentialsPressureFromMats.bind(null, []),
-    pChunks,
-    errors1
-  );
+  materializePotentiality(toPlace, updatePotentialsPressureFromMats([]), pChunks, errors1);
   const pChunks2 = computePressureChunks({ startDate: 42, endDate: 52 }, []);
-  materializePotentiality(
-    toPlace,
-    updatePotentialsPressureFromMats.bind(null, []),
-    pChunks2,
-    errors2
-  );
+  materializePotentiality(toPlace, updatePotentialsPressureFromMats([]), pChunks2, errors2);
   return Observable.zip(errors1, errors2).pipe(map(vals => t.pass('should have errors')), first());
 });
 
@@ -187,11 +179,6 @@ test('materialize will throw if not placable without conflict', t => {
   ];
   const pChunks = computePressureChunks({ startDate: 0, endDate: 10 }, pots);
   t.throws(
-    materializePotentiality.bind(
-      null,
-      toPlace,
-      updatePotentialsPressureFromMats.bind(null, pots),
-      pChunks
-    )
+    materializePotentiality.bind(null, toPlace, updatePotentialsPressureFromMats(pots), pChunks)
   );
 });
