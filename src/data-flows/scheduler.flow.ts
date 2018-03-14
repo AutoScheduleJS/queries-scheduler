@@ -233,9 +233,8 @@ const buildUserstateHandler = (
   error$?: BehaviorSubject<any>
 ) => (query: IQuery, pots: ReadonlyArray<IPotentiality>, mats: ReadonlyArray<IMaterial>) => {
   try {
-    const otherPots = pots /*.filter(potIsNotPlaced(mats))*/;
     const otherMats = mats.filter(mat => mat.queryId !== query.id);
-    const userstateMask = userstateHandler(query, [...otherPots], [...otherMats]);
+    const userstateMask = userstateHandler(query, [...pots], [...otherMats]);
     return userstateMask;
   } catch (e) {
     if (error$) {
@@ -258,7 +257,7 @@ const managePotentials = (
     materials
   );
   const filteredResult = result.filter(pot => pot.places.length && potIsNotPlaced(materials)(pot));
-  if (result.length === filteredResult.length) {
+  if (result.length === result.filter(pot => pot.places.length).length) {
     error$.next(null);
   }
   replacePotsFn(filteredResult);

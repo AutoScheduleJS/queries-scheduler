@@ -359,26 +359,26 @@ test('debug version will emit intermediate results', t => {
         t.is(result[2], null);
       } else if (lap === 3) {
         t.is(result[0], null);
-        t.is(result[1].length, 2);
+        t.is(result[1].length, 1);
         t.is(result[2], null);
       } else if (lap === 4) {
         t.is(result[0], null);
-        t.is(result[1].length, 2);
-        t.is(result[2].length, 0);
+        t.is(result[1].length, 0);
+        t.is(result[2], null);
       } else if (lap === 5) {
         t.is(result[0], null);
-        t.is(result[1].length, 2);
-        t.is(result[2].length, 2);
+        t.is(result[1].length, 0);
+        t.is(result[2].length, 0);
       } else if (lap === 6) {
         t.is(result[0], null);
-        t.is(result[1].length, 2);
-        t.is(result[2].length, 2);
-        t.is(result[3].length, 0);
+        t.is(result[1].length, 0);
+        t.is(result[2].length, 1);
+        t.is(result[3], null);
       } else if (lap === 7) {
         t.is(result[0], null);
-        t.is(result[1].length, 2);
+        t.is(result[1].length, 0);
         t.is(result[2].length, 2);
-        t.is(result[3].length, 1);
+        t.is(result[3], null);
       } else if (lap > 12) {
         t.fail();
       }

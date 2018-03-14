@@ -36,7 +36,7 @@ const potentialFactory = (
 };
 
 const updatePotentialsPressureFromMats = (pots: IPotentiality[]) => (materials: any) =>
-  updatePotentialsPressure(pots, materials, []);
+  updatePotentialsPressure(pots, materials);
 
 test('will compute pressure', t => {
   t.is(computePressure(potentialFactory({ min: 1, target: 1 }, [{ end: 1, start: 0 }])), 1);
