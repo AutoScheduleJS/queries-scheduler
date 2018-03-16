@@ -233,8 +233,9 @@ const buildUserstateHandler = (
   error$?: BehaviorSubject<any>
 ) => (query: IQuery, pots: ReadonlyArray<IPotentiality>, mats: ReadonlyArray<IMaterial>) => {
   try {
+    const otherPots = pots.filter(p => p.queryId !== query.id);
     const otherMats = mats.filter(mat => mat.queryId !== query.id);
-    const userstateMask = userstateHandler(query, [...pots], [...otherMats]);
+    const userstateMask = userstateHandler(query, [...otherPots], [...otherMats]);
     return userstateMask;
   } catch (e) {
     if (error$) {

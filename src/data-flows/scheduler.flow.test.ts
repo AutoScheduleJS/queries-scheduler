@@ -452,3 +452,71 @@ test('Will handle provider of provider', t => {
     })
   );
 });
+
+test('will handle empty need search', t => {
+  const config: IConfig = { endDate: 100, startDate: 0 };
+  const queries: Q.IQuery[] = [
+    Q.queryFactory(
+      Q.id(1),
+      Q.name('consumer'),
+      Q.duration(Q.timeDuration(4, 2)),
+      Q.transforms([Q.need(false, 'col', { test: 'toto' }, 1, '1')], [], [])
+    ),
+    Q.queryFactory(
+      Q.id(2),
+      Q.name('provider'),
+      Q.duration(Q.timeDuration(4, 2)),
+      Q.transforms(
+        [Q.need(false, 'col', {}, 1, '1')],
+        [],
+        [{ collectionName: 'col', doc: { test: 'toto' }, wait: true }]
+      )
+    ),
+  ];
+  const testStateManager = queryToStatePotentials([]);
+  return queriesToPipeline$(config)(testStateManager)(queries).pipe(
+    map(result => {
+      t.true(result.length > 0);
+    })
+  );
+});
+
+test('will work when provider potential has multiple places', t => {
+  const config: IConfig = { endDate: 50, startDate: 0 };
+  const queries: Q.IQuery[] = [
+    Q.queryFactory(
+      Q.id(1),
+      Q.name('consumer'),
+      Q.start(45, 1),
+      Q.end(49, 5),
+      Q.duration(Q.timeDuration(4, 2)),
+      Q.transforms([Q.need(false, 'col', { test: 'toto' }, 1, '1')], [], [])
+    ),
+    Q.queryFactory(
+      Q.id(2),
+      Q.name('provider'),
+      Q.duration(Q.timeDuration(4, 2)),
+      Q.transforms(
+        [Q.need(false, 'col', { test: 'tata' }, 1, '1')],
+        [],
+        [{ collectionName: 'col', doc: { test: 'toto' }, wait: true }]
+      )
+    ),
+    Q.queryFactory(
+      Q.id(3),
+      Q.name('query'),
+      Q.start(1),
+      Q.end(5),
+      Q.duration(Q.timeDuration(4, 2))
+    ),
+  ];
+  const testStateManager = queryToStatePotentials([]);
+  return queriesToPipeline$(config)(testStateManager)(queries).pipe(
+    map(result => {
+      t.is(result.length, 3);
+      validateSE(t, result[0], [1, 5], 3);
+      validateSE(t, result[1], [5, 9], 2);
+      validateSE(t, result[2], [45, 49], 1);
+    })
+  );
+});
