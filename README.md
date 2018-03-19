@@ -26,6 +26,7 @@ operations:
 - task potential = intersection of query potential (internal constraints) + query dependencies + user state potential + materials.
 - impossible to place (material time) => throw exception. (conflict)
 - query that occurs x time before/after state: Link to material that update state -> link field, queries-scheduler module.
+- How to allow link to a material from another agent ? Could be after the second phase, when agent receive queries's context. (Link to an ID)
 - Only one exception is permitted: conflict error that needs user. Others are caught (from userstate) with conflict-resolver
 - providers handle is complex. Use priority list. Can cause side-effect conflict. How to go back to the source of conflict ? How to switch from 1st priority to another ? Simulation with satisfaction threshold for all materials ? heavy cost (recursive and exponential, due to provider sub-dependance to other providers).
 - Agents -> queries ; conflict-resolver (error): query -> agent ; manage agents as a stream
@@ -67,3 +68,6 @@ userstate-manager
 
 Module a: if provider is impossible to place, either there is no need for it, or there is a conflict. Use user-state to determine.
 userstate-manager: query + (potential/material) with needs + config + base needs => ranges of possibilities
+
+Queries restrictions:
+- provider (insert/update with 'wait: true' can't specify start/end) -> will prevent correct material placement order.
