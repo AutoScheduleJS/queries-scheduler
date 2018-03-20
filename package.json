@@ -36,7 +36,7 @@
   "homepage": "https://github.com/AutoScheduleJS/queries-scheduler#readme",
   "dependencies": {},
   "devDependencies": {
-    "@autoschedule/queries-fn": "^4.1.1",
+    "@autoschedule/queries-fn": "^5.0.0",
     "@autoschedule/userstate-manager": "^3.0.1",
     "@semantic-release/release-notes-generator": "^6.0.3",
     "@types/ramda": "github:types/npm-ramda#dist",
