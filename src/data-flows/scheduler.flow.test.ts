@@ -165,7 +165,7 @@ test('will find space where resource is available from material', t => {
   const provide = Q.queryFactory(
     Q.id(66),
     Q.duration(Q.timeDuration(1)),
-    Q.transforms([], [], [{ collectionName: 'test', doc: { response: 42 } }])
+    Q.transforms([], [], [{ collectionName: 'test', doc: { response: 42 }, quantity: 1 }])
   );
   return queriesToPipeline$(config)(stateManager)([consumer, provide]).pipe(
     map(result => {
@@ -203,7 +203,7 @@ test('provider will wait consumer', t => {
   const provider = Q.queryFactory(
     Q.id(2),
     Q.duration(Q.timeDuration(4, 2)),
-    Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'toto' }, wait: true }])
+    Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'toto' }, quantity: 1, wait: true }])
   );
   return queriesToPipeline$(config)(stateManager)([consumer, provider]).pipe(
     map(result => {
@@ -227,7 +227,7 @@ test('provider will wait consumer which have Q.duration', t => {
       Q.id(2),
       Q.name('provider'),
       Q.duration(Q.timeDuration(4, 2)),
-      Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'toto' }, wait: true }])
+      Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'toto' }, quantity: 1, wait: true }])
     ),
   ];
   return queriesToPipeline$(config)(stateManager)(queries).pipe(
@@ -248,7 +248,7 @@ test('provider will error when impossible to place', t => {
   const provider = Q.queryFactory(
     Q.id(2),
     Q.duration(Q.timeDuration(4, 2)),
-    Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'toto' }, wait: true }])
+    Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'toto' }, quantity: 1, wait: true }])
   );
   return queriesToPipelineDebug$(config, true)(stateManager)([consumer, provider])[0].pipe(
     takeLast(1),
@@ -436,14 +436,14 @@ test('Will handle provider of provider', t => {
       Q.transforms(
         [Q.need(false, 'col', { test: 'tata' }, 1, '1')],
         [],
-        [{ collectionName: 'col', doc: { test: 'toto' }, wait: true }]
+        [{ collectionName: 'col', doc: { test: 'toto' }, quantity: 1, wait: true }]
       )
     ),
     Q.queryFactory(
       Q.id(3),
       Q.name('provide_tata'),
       Q.duration(Q.timeDuration(4, 2)),
-      Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'tata' }, wait: true }])
+      Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'tata' }, quantity: 1, wait: true }])
     ),
   ];
   return queriesToPipeline$(config)(stateManager)(queries).pipe(
@@ -469,7 +469,7 @@ test('will handle empty need search', t => {
       Q.transforms(
         [Q.need(false, 'col', {}, 1, '1')],
         [],
-        [{ collectionName: 'col', doc: { test: 'toto' }, wait: true }]
+        [{ collectionName: 'col', doc: { test: 'toto' }, quantity: 1, wait: true }]
       )
     ),
   ];
@@ -499,7 +499,7 @@ test('will work when provider potential has multiple places', t => {
       Q.transforms(
         [Q.need(false, 'col', { test: 'tata' }, 1, '1')],
         [],
-        [{ collectionName: 'col', doc: { test: 'toto' }, wait: true }]
+        [{ collectionName: 'col', doc: { test: 'toto' }, quantity: 1, wait: true }]
       )
     ),
     Q.queryFactory(

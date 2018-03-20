@@ -2,17 +2,17 @@ import {
   GoalKind,
   IAtomicQuery,
   IGoalQuery,
-  IProviderQuery,
   ITimeBoundary,
   ITimeDuration,
   ITimeRestriction,
   RestrictionCondition,
 } from '@autoschedule/queries-fn';
-import { complement, intersect } from 'intervals-fn';
+import { complement, intersect, unify } from 'intervals-fn';
 import * as moment from 'moment';
 import * as R from 'ramda';
 
 import { IConfig } from '../data-structures/config.interface';
+import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { IRange } from '../data-structures/range.interface';
 
@@ -165,15 +165,47 @@ const atomicToDuration = ifHasDuration(
   })
 );
 
+/**
+ * TODO: sanitize queries -> all timeBoundary's fields are mandatory
+ */
+const shiftWithTimeBoundary = (shift: ITimeBoundary, origin: number) => ({
+  max: shift.max ? origin + shift.max : origin,
+  min: shift.min ? origin + shift.min : origin,
+  target: shift.target ? origin + shift.target : origin,
+});
+
+export const linkToMask = (materials: ReadonlyArray<IMaterial>, config: IConfig) => (
+  query: IAtomicQuery
+): ReadonlyArray<IRange> => {
+  if (!query.links) {
+    return [{ end: config.endDate, start: config.startDate }];
+  }
+  return query.links
+    .map(link => {
+      return materials
+        .filter(
+          range =>
+            range.queryId === link.queryId &&
+            range.materialId === link.potentialId &&
+            range.splitId === link.splitId
+        )
+        .map(target => {
+          const duration = atomicToDuration(query);
+          const start = shiftWithTimeBoundary(link.distance, target[link.origin]);
+          return [{ start: start.min, end: start.max + duration.target }];
+        })
+        .reduce((a, b) => unify(a, b));
+    })
+    .reduce((a, b) => intersect(a, b));
+};
+
 const atomicToChildren = (c: IConfig) =>
   R.applySpec<IRange>({
     end: ifHasEnd(qEnd('target'), R.always(c.endDate)),
     start: ifHasStart(qStart('target'), R.always(c.startDate)),
   });
 
-export const atomicToPotentiality = (config: IConfig) => (
-  query: IAtomicQuery | IProviderQuery
-): IPotentiality[] => {
+export const atomicToPotentiality = (config: IConfig) => (query: IAtomicQuery): IPotentiality[] => {
   const duration = atomicToDuration(query) as ITimeDuration;
   const place = atomicToChildren(config)(query);
   const queryId = query.id;

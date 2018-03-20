@@ -1,9 +1,7 @@
 import {
   IGoalQuery,
-  IProviderQuery,
   IQuery,
   isGoalQuery,
-  isProviderQuery,
 } from '@autoschedule/queries-fn';
 
 import * as R from 'ramda';
@@ -24,6 +22,7 @@ import {
 import {
   atomicToPotentiality,
   goalToPotentiality,
+  linkToMask,
   mapToHourRange,
   mapToMonthRange,
   mapToTimeRestriction,
@@ -278,6 +277,7 @@ const queriesToPotentialities = (
         queryToPotentiality(config),
         () => materials,
         queryToMask(config),
+        linkToMask([...materials, ...R.unnest(potentials.map(potentialToMaterial))], config),
         (q: IQuery) => userstateHandler(q, [...potentials], [...materials]),
       ])
     )
@@ -288,6 +288,14 @@ const replacePotentials = (potentials$: BehaviorSubject<ReadonlyArray<IPotential
 ): void => {
   potentials$.next(potentials);
 };
+
+const potentialToMaterial = (potential: IPotentiality): ReadonlyArray<IMaterial> => potential.places.map(place => ({
+  end: place.end,
+  materialId: potential.potentialId,
+  queryId: potential.queryId,
+  splitId: undefined,
+  start: place.start,
+}));
 
 const addMaterials = (materials$: BehaviorSubject<ReadonlyArray<IMaterial>>) => (
   materials: ReadonlyArray<IMaterial>
@@ -311,14 +319,21 @@ const emitPressureChunks = (
   return pressureChunk;
 };
 
+const defaultMask = (config: IConfig): IRange[] => [
+  {
+    end: config.endDate,
+    start: config.startDate,
+  },
+];
+
 const queryToMask = R.curry((config: IConfig, query: IQuery): IRange[] => {
-  if (isGoalQuery(query) || isProviderQuery(query)) {
+  if (isGoalQuery(query)) {
     return timeRestToMask(config, query);
   }
-  return [{ start: config.startDate, end: config.endDate }];
+  return defaultMask(config);
 });
 
-const timeRestToMask = (config: IConfig, query: IGoalQuery | IProviderQuery): IRange[] => {
+const timeRestToMask = (config: IConfig, query: IGoalQuery): IRange[] => {
   const timeRestrictions = query.timeRestrictions || {};
   const maskPipeline = R.pipe(
     mapToTimeRestriction(timeRestrictions.month, mapToMonthRange),

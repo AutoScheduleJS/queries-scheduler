@@ -4,6 +4,7 @@ import test from 'ava';
 import {
   atomicToPotentiality,
   goalToPotentiality,
+  linkToMask,
   mapToHourRange,
   mapToMonthRange,
   mapToTimeRestriction,
@@ -11,6 +12,7 @@ import {
 } from './queries.flow';
 
 import { IConfig } from '../data-structures/config.interface';
+import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 
 test('will map nothing when no timeRestrictions', t => {
@@ -129,6 +131,134 @@ test('will convert atomic to potentiality (start, end)', t => {
   t.is(pot[0].places[0].end, 6);
   t.is(pot[0].duration.target, 1);
   t.is(pot[0].duration.min, 1);
+});
+
+test('will link to mask (one material) end', t => {
+  const materials: ReadonlyArray<IMaterial> = [
+    {
+      end: 20,
+      materialId: 1,
+      queryId: 0,
+      start: 10,
+    },
+    {
+      end: 5,
+      materialId: 0,
+      queryId: 0,
+      start: 0,
+    },
+  ];
+  const config: IConfig = { startDate: 0, endDate: 30 };
+  const queryLink: Q.IQueryLink = {
+    distance: { max: 10, min: 5, target: 8 },
+    origin: 'end',
+    potentialId: 0,
+    queryId: 0,
+  };
+  const query = Q.queryFactory<Q.IAtomicQuery>(
+    Q.duration(Q.timeDuration(10, 5)),
+    Q.links(queryLink)
+  );
+  const result = linkToMask(materials, config)(query);
+  t.is(result.length, 1);
+  t.is(result[0].start, 10);
+  t.is(result[0].end, 25);
+});
+
+test('will link to mask (one material) start', t => {
+  const materials: ReadonlyArray<IMaterial> = [
+    {
+      end: 20,
+      materialId: 0,
+      queryId: 0,
+      start: 15,
+    },
+  ];
+  const config: IConfig = { startDate: 0, endDate: 30 };
+  const queryLink: Q.IQueryLink = {
+    distance: { max: -5, min: -10, target: -8 },
+    origin: 'start',
+    potentialId: 0,
+    queryId: 0,
+  };
+  const query = Q.queryFactory<Q.IAtomicQuery>(
+    Q.duration(Q.timeDuration(4, 2)),
+    Q.links(queryLink)
+  );
+  const result = linkToMask(materials, config)(query);
+  t.is(result.length, 1);
+  t.is(result[0].start, 5);
+  t.is(result[0].end, 14);
+});
+
+test('will link to mask (potential with multiples places) end', t => {
+  const materials: ReadonlyArray<IMaterial> = [
+    {
+      end: 5,
+      materialId: 0,
+      queryId: 0,
+      start: 0,
+    },
+    {
+      end: 40,
+      materialId: 0,
+      queryId: 0,
+      start: 35,
+    },
+  ];
+  const config: IConfig = { startDate: 0, endDate: 60 };
+  const queryLink: Q.IQueryLink = {
+    distance: { max: 10, min: 5, target: 8 },
+    origin: 'end',
+    potentialId: 0,
+    queryId: 0,
+  };
+  const query = Q.queryFactory<Q.IAtomicQuery>(
+    Q.duration(Q.timeDuration(4, 2)),
+    Q.links(queryLink)
+  );
+  const result = linkToMask(materials, config)(query);
+  t.is(result.length, 2);
+  t.is(result[0].end, 19);
+  t.is(result[0].start, 10);
+  t.is(result[1].end, 54);
+  t.is(result[1].start, 45);
+});
+
+test('will link to mask (multiple links) end', t => {
+  const materials: ReadonlyArray<IMaterial> = [
+    {
+      end: 20,
+      materialId: 0,
+      queryId: 0,
+      start: 10,
+    },
+    {
+      end: 30,
+      materialId: 0,
+      queryId: 1,
+      start: 15,
+    },
+  ];
+  const config: IConfig = { startDate: 0, endDate: 45 };
+  const query = Q.queryFactory<Q.IAtomicQuery>(
+    Q.duration(Q.timeDuration(4, 2)),
+    Q.links({
+      distance: { max: 10, min: 5, target: 8 },
+      origin: 'end',
+      potentialId: 0,
+      queryId: 0,
+    }, {
+      distance: { max: 5, min: 2, target: 3 },
+      origin: 'end',
+      potentialId: 0,
+      queryId: 1,
+    })
+  );
+  const result = linkToMask(materials, config)(query);
+  t.is(result.length, 1);
+  t.is(result[0].end, 34);
+  t.is(result[0].start, 32);
 });
 
 test('will convert goal to potentiality', t => {
