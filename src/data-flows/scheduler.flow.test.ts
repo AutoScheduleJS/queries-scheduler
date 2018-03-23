@@ -121,10 +121,10 @@ test('will schedule one atomic goal query', t => {
       Q.goal(Q.GoalKind.Atomic, Q.timeDuration(2), +dur(1, 'day'))
     ),
   ];
-  t.plan(3 * 2 + 1);
+  t.plan(3 * 2);
   return queriesToPipeline$(config)(stateManager)(queries).pipe(
     map(result => {
-      t.is(result.length, 2 * 3);
+      t.is(result.length, 2 * 3 - 1);
       result.forEach(material => {
         const matDur = material.end - material.start;
         t.is(matDur, durTarget);
@@ -203,7 +203,11 @@ test('provider will wait consumer', t => {
   const provider = Q.queryFactory(
     Q.id(2),
     Q.duration(Q.timeDuration(4, 2)),
-    Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'toto' }, quantity: 1, wait: true }])
+    Q.transforms(
+      [],
+      [],
+      [{ collectionName: 'col', doc: { test: 'toto' }, quantity: 1, wait: true }]
+    )
   );
   return queriesToPipeline$(config)(stateManager)([consumer, provider]).pipe(
     map(result => {
@@ -227,7 +231,11 @@ test('provider will wait consumer which have Q.duration', t => {
       Q.id(2),
       Q.name('provider'),
       Q.duration(Q.timeDuration(4, 2)),
-      Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'toto' }, quantity: 1, wait: true }])
+      Q.transforms(
+        [],
+        [],
+        [{ collectionName: 'col', doc: { test: 'toto' }, quantity: 1, wait: true }]
+      )
     ),
   ];
   return queriesToPipeline$(config)(stateManager)(queries).pipe(
@@ -248,7 +256,11 @@ test('provider will error when impossible to place', t => {
   const provider = Q.queryFactory(
     Q.id(2),
     Q.duration(Q.timeDuration(4, 2)),
-    Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'toto' }, quantity: 1, wait: true }])
+    Q.transforms(
+      [],
+      [],
+      [{ collectionName: 'col', doc: { test: 'toto' }, quantity: 1, wait: true }]
+    )
   );
   return queriesToPipelineDebug$(config, true)(stateManager)([consumer, provider])[0].pipe(
     takeLast(1),
@@ -443,7 +455,11 @@ test('Will handle provider of provider', t => {
       Q.id(3),
       Q.name('provide_tata'),
       Q.duration(Q.timeDuration(4, 2)),
-      Q.transforms([], [], [{ collectionName: 'col', doc: { test: 'tata' }, quantity: 1, wait: true }])
+      Q.transforms(
+        [],
+        [],
+        [{ collectionName: 'col', doc: { test: 'tata' }, quantity: 1, wait: true }]
+      )
     ),
   ];
   return queriesToPipeline$(config)(stateManager)(queries).pipe(
@@ -471,6 +487,31 @@ test('will handle empty need search', t => {
         [],
         [{ collectionName: 'col', doc: { test: 'toto' }, quantity: 1, wait: true }]
       )
+    ),
+  ];
+  const testStateManager = queryToStatePotentials([]);
+  return queriesToPipeline$(config)(testStateManager)(queries).pipe(
+    map(result => {
+      t.true(result.length > 0);
+    })
+  );
+});
+
+test('will correctly link queries', t => {
+  const config: IConfig = { endDate: 50, startDate: 0 };
+  const queries: Q.IQuery[] = [
+    Q.queryFactory(
+      Q.id(1),
+      Q.name('query'),
+      Q.start(25),
+      Q.end(30),
+      Q.duration(Q.timeDuration(4, 2))
+    ),
+    Q.queryFactory(
+      Q.id(2),
+      Q.name('query'),
+      Q.duration(Q.timeDuration(4, 2)),
+      Q.links(Q.queryLink({ max: 10, min: 5 }, 'end', 1, 0))
     ),
   ];
   const testStateManager = queryToStatePotentials([]);

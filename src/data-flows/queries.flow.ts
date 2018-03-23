@@ -194,7 +194,7 @@ export const linkToMask = (materials: ReadonlyArray<IMaterial>, config: IConfig)
           const start = shiftWithTimeBoundary(link.distance, target[link.origin]);
           return [{ start: start.min, end: start.max + duration.target }];
         })
-        .reduce((a, b) => unify(a, b));
+        .reduce((a, b) => unify(a, b), []);
     })
     .reduce((a, b) => intersect(a, b));
 };
