@@ -121,10 +121,10 @@ test('will schedule one atomic goal query', t => {
       Q.goal(Q.GoalKind.Atomic, Q.timeDuration(2), +dur(1, 'day'))
     ),
   ];
-  t.plan(3 * 2);
+  t.plan(3 * 2 + 1);
   return queriesToPipeline$(config)(stateManager)(queries).pipe(
     map(result => {
-      t.is(result.length, 2 * 3 - 1);
+      t.is(result.length, 2 * 3);
       result.forEach(material => {
         const matDur = material.end - material.start;
         t.is(matDur, durTarget);
