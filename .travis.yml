@@ -10,6 +10,7 @@ notifications:
   email: false
 node_js:
   - '8'
+  - '10'
 before_script:
   - npm prune
   - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
