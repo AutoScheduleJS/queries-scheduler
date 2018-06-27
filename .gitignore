@@ -1,6 +1,7 @@
 node_modules
-dist
+lib
 coverage
 .nyc_output
 build
+es
 docs
