@@ -1,48 +1,34 @@
-import {
-  IGoalQuery,
-  IQuery,
-  isGoalQuery,
-} from '@autoschedule/queries-fn';
-
+import { IQueryInternal } from '@autoschedule/queries-fn';
 import * as R from 'ramda';
-import 'rxjs/add/observable/combineLatest';
-import 'rxjs/add/observable/forkJoin';
-import 'rxjs/add/observable/of';
-import { BehaviorSubject } from 'rxjs/BehaviorSubject';
-import { Observable } from 'rxjs/Observable';
-import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable';
-import { combineLatest, distinctUntilChanged, map, publishReplay } from 'rxjs/operators';
-import { Subject } from 'rxjs/Subject';
-
+import { BehaviorSubject, combineLatest, ConnectableObservable, forkJoin, Observable, Subject } from 'rxjs';
+import { distinctUntilChanged, map, publishReplay } from 'rxjs/operators';
 import {
   computePressureChunks,
   materializePotentiality,
+  placeToRange,
   updatePotentialsPressure,
 } from '../data-flows/pipes.flow';
 import {
-  atomicToPotentiality,
-  goalToPotentiality,
   linkToMask,
   mapToHourRange,
   mapToMonthRange,
   mapToTimeRestriction,
   mapToWeekdayRange,
+  queryToPotentiality,
 } from '../data-flows/queries.flow';
-
 import { IConfig } from '../data-structures/config.interface';
 import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
 import { IPressureChunk } from '../data-structures/pressure-chunk.interface';
 import { IRange } from '../data-structures/range.interface';
+import { getMax, sortByStart } from './util.flow';
 
-const sortByStart = R.sortBy<IMaterial>(R.prop('start'));
-const getMax = <T>(prop: keyof T, list: ReadonlyArray<T>): T =>
-  R.reduce(R.maxBy(R.prop(prop) as (n: any) => number), list[0], list);
+type IQuery = IQueryInternal;
 
 export const queriesToPipeline$ = (config: IConfig) => (stateManager: stateManagerType) => (
   queries: ReadonlyArray<IQuery>
 ): Observable<ReadonlyArray<IMaterial>> => {
-  return Observable.forkJoin(queriesToPipelineDebug$(config, false)(stateManager)(queries)).pipe(
+  return forkJoin(queriesToPipelineDebug$(config)(stateManager)(queries)).pipe(
     map((values: any) => {
       if (values[0] != null) {
         throw valueToError(values);
@@ -61,11 +47,9 @@ const takeLatestFromBS = <T, D>(bs: BehaviorSubject<D>) => (source: Observable<T
 
 export type stateManagerType = (
   c: IConfig
-) => (q: IQuery[]) => (q: IQuery, p: IPotentiality[], m: IMaterial[]) => IRange[];
+) => (q: IQueryInternal[]) => (q: IQueryInternal, p: IPotentiality[], m: IMaterial[]) => IRange[];
 
-export const queriesToPipelineDebug$ = (config: IConfig, debug?: boolean) => (
-  stateManager: stateManagerType
-) => (
+export const queriesToPipelineDebug$ = (config: IConfig) => (stateManager: stateManagerType) => (
   queries: ReadonlyArray<IQuery>
 ): [
   Observable<any>,
@@ -97,8 +81,8 @@ export const queriesToPipelineDebug$ = (config: IConfig, debug?: boolean) => (
   materialsDebug$.connect();
   pressureChunkDebug$.connect();
 
-  potentialsWorking$.pipe(combineLatest(materialsWorking$)).subscribe(testWorkers(toClose));
-  Observable.combineLatest(potentialsOb$, materialsOb$).subscribe(
+  combineLatest(potentialsWorking$, materialsWorking$).subscribe(testWorkers(toClose));
+  combineLatest(potentialsOb$, materialsOb$).subscribe(
     managePotentials(config, replacePotentials(potentialsBS$), userstateHandler, queries, errorsBS$)
   );
   potentialsBS$
@@ -124,7 +108,7 @@ export const combineSchedulerObservables = (
     bs.forEach((s, i) => schedulerObs[i].subscribe(v => s.next(v), undefined, () => s.complete()));
   }, 0);
 
-  return Observable.combineLatest(bs);
+  return combineLatest(bs);
 };
 
 const closeAllBS = (...toClose: Array<BehaviorSubject<any>>) => (): void => {
@@ -165,7 +149,10 @@ const arePotentialitiesSimilar = (xa: IPotentiality) => (xb: IPotentiality): boo
     xa.places.length === xb.places.length &&
     xa.places.every((xaa, ii) => {
       const xbb = xb.places[ii];
-      return xaa.start === xbb.start && xaa.end === xbb.end;
+      return xaa.every((xaaa, iii) => {
+        const xbbb = xbb[iii];
+        return xaaa.start === xbbb.start && xaaa.end === xbbb.end && xaaa.kind === xbbb.kind;
+      });
     })
   );
 };
@@ -271,17 +258,25 @@ const queriesToPotentialities = (
   potentials: ReadonlyArray<IPotentiality>,
   materials: ReadonlyArray<IMaterial>
 ): IPotentiality[] =>
-  R.unnest(
-    queries.map(
-      R.converge(updatePotentialsPressure, [
-        queryToPotentiality(config),
-        () => materials,
-        queryToMask(config),
-        linkToMask([...materials, ...R.unnest(potentials.map(potentialToMaterial))], config),
-        (q: IQuery) => userstateHandler(q, [...potentials], [...materials]),
-      ])
-    )
-  );
+  queries.map(query => {
+    const pot = queryToPotentiality(query);
+    const filteredMats = materials.filter(
+      m => m.queryId !== pot.queryId || m.materialId !== pot.potentialId
+    );
+    return updatePotentialsPressure(
+      config,
+      query.position,
+      pot,
+      filteredMats,
+      queryToMask(config, query),
+      [
+        ...linkToMask([...materials, ...R.unnest(potentials.map(potentialToMaterial))], config)(
+          query
+        ),
+      ],
+      userstateHandler(query, [...potentials], [...materials])
+    );
+  });
 
 const replacePotentials = (potentials$: BehaviorSubject<ReadonlyArray<IPotentiality>>) => (
   potentials: ReadonlyArray<IPotentiality>
@@ -289,26 +284,23 @@ const replacePotentials = (potentials$: BehaviorSubject<ReadonlyArray<IPotential
   potentials$.next(potentials);
 };
 
-const potentialToMaterial = (potential: IPotentiality): ReadonlyArray<IMaterial> => potential.places.map(place => ({
-  end: place.end,
-  materialId: potential.potentialId,
-  queryId: potential.queryId,
-  splitId: undefined,
-  start: place.start,
-}));
+const potentialToMaterial = (potential: IPotentiality): ReadonlyArray<IMaterial> =>
+  potential.places.map(place => {
+    const range = placeToRange(place);
+    return {
+      end: range.end,
+      materialId: potential.potentialId,
+      queryId: potential.queryId,
+      splitId: undefined,
+      start: range.start,
+    };
+  });
 
 const addMaterials = (materials$: BehaviorSubject<ReadonlyArray<IMaterial>>) => (
   materials: ReadonlyArray<IMaterial>
 ): void => {
   const newMaterials = sortByStart([...materials$.value, ...materials]);
   materials$.next(newMaterials);
-};
-
-const queryToPotentiality = (config: IConfig) => (query: IQuery) => {
-  if (isGoalQuery(query)) {
-    return goalToPotentiality(config)(query);
-  }
-  return atomicToPotentiality(config)(query);
 };
 
 const emitPressureChunks = (
@@ -326,19 +318,22 @@ const defaultMask = (config: IConfig): IRange[] => [
   },
 ];
 
-const queryToMask = R.curry((config: IConfig, query: IQuery): IRange[] => {
-  if (isGoalQuery(query)) {
+const queryToMask = R.curry(
+  (config: IConfig, query: IQuery): IRange[] => {
     return timeRestToMask(config, query);
   }
-  return defaultMask(config);
-});
+);
 
-const timeRestToMask = (config: IConfig, query: IGoalQuery): IRange[] => {
-  const timeRestrictions = query.timeRestrictions || {};
+const timeRestToMask = (config: IConfig, query: IQuery): IRange[] => {
+  const configMask = defaultMask(config);
+  if (!query.timeRestrictions) {
+    return configMask;
+  }
+  const timeRestrictions = query.timeRestrictions;
   const maskPipeline = R.pipe(
     mapToTimeRestriction(timeRestrictions.month, mapToMonthRange),
     mapToTimeRestriction(timeRestrictions.weekday, mapToWeekdayRange),
     mapToTimeRestriction(timeRestrictions.hour, mapToHourRange)
   );
-  return maskPipeline([{ start: config.startDate, end: config.endDate }]);
+  return maskPipeline(configMask);
 };

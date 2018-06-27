@@ -12,7 +12,7 @@
       "name": "Run main AVA tests",
       "program": "${workspaceRoot}/node_modules/ava/profile.js",
       "args": [
-        "${workspaceFolder}/build/data-flows/main.flow.test.js"
+        "${workspaceFolder}/build/test/main.flow.test.js"
       ]
     },
     {
@@ -22,7 +22,7 @@
       "name": "Run queries AVA tests",
       "program": "${workspaceRoot}/node_modules/ava/profile.js",
       "args": [
-        "${workspaceFolder}/build/data-flows/queries.flow.test.js"
+        "${workspaceFolder}/build/test/queries.flow.test.js"
       ]
     },
     {
@@ -32,7 +32,7 @@
       "name": "Run scheduler AVA tests",
       "program": "${workspaceRoot}/node_modules/ava/profile.js",
       "args": [
-        "${workspaceFolder}/build/data-flows/scheduler.flow.test.js"
+        "${workspaceFolder}/build/test/scheduler.flow.test.js"
       ]
     },
     {
@@ -42,7 +42,7 @@
       "name": "Run pipes AVA tests",
       "program": "${workspaceRoot}/node_modules/ava/profile.js",
       "args": [
-        "${workspaceFolder}/build/data-flows/pipes.flow.test.js"
+        "${workspaceFolder}/build/test/pipes.flow.test.js"
       ]
     }
   ]

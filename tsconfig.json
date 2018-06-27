@@ -1,29 +1,13 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2017",
-    "module": "commonjs",
-    "lib": [
-      "es2017",
-      "dom"
-    ],
-    "types": [],
-    "declaration": true,
-    "inlineSourceMap": true,
-    "inlineSources": true,
     "outDir": "./build",
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "noImplicitThis": true,
-    "alwaysStrict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": false,
-    "noImplicitReturns": true,
-    "moduleResolution": "node",
-    "baseUrl": "./"
+    "baseUrl": "./",
+    "sourceMap": true
   },
   "include": [
-    "src/**/*"
+    "src/*",
+    "test/*"
   ],
   "exclude": [
     "node_modules"
