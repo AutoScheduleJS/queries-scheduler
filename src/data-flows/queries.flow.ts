@@ -1,28 +1,30 @@
 import {
-  GoalKind,
-  IAtomicQuery,
-  IGoalQuery,
+  IQueryInternal,
+  IQueryPositionDurationInternal,
   ITimeBoundary,
-  ITimeDuration,
+  ITimeDurationInternal,
   ITimeRestriction,
   RestrictionCondition,
 } from '@autoschedule/queries-fn';
-import { complement, intersect, unify } from 'intervals-fn';
+import { complement, intersect, split, unify } from 'intervals-fn';
 import * as moment from 'moment';
 import * as R from 'ramda';
-
 import { IConfig } from '../data-structures/config.interface';
 import { IMaterial } from '../data-structures/material.interface';
 import { IPotentiality } from '../data-structures/potentiality.interface';
-import { IRange } from '../data-structures/range.interface';
+import { IPotRange, IRange } from '../data-structures/range.interface';
+import {
+  chunkToSeg,
+  defaultIfNaN,
+  getYfromStartEndLine,
+  propOrDefault,
+} from './util.flow';
 
+type IQuery = IQueryInternal;
 type maskFn = (tm: IRange) => IRange[];
 type mapRange = (r: IRange[], tm: IRange) => IRange[];
-type toNumber = (o: any) => number;
-type toTBToNumber = (t: keyof ITimeBoundary) => (o: any) => number;
 type getFirstFn = (rest: IRange) => IRange;
 type unfoldRange = (seed: IRange) => false | [IRange, IRange];
-type toTimeDur = (o: any) => ITimeDuration;
 
 export const mapToMonthRange = (restricts: IRange[], mask: IRange): IRange[] => {
   const end = +moment(mask.end).endOf('day');
@@ -100,70 +102,20 @@ const getFirstHourRange = R.curry((mask: IRange, restrict: IRange): IRange => {
 
 const getMaskFilterFn = (tr: ITimeRestriction, mapFn: mapRange): maskFn => {
   return R.converge(
-    (ranges: IRange[], mask: IRange) =>
-      tr.condition === RestrictionCondition.InRange ? ranges : complement(mask, ranges),
+    (ranges: IRange[], mask: IRange) => {
+      return tr.condition === RestrictionCondition.InRange ? ranges : complement(mask, ranges)
+    },
     [
       R.converge(intersect, [
         R.partial(mapFn, [tr.ranges.map(r => ({ start: r[0], end: r[1] }))]),
-        R.identity,
+        range => [range],
       ]),
       R.identity,
     ]
   );
 };
 
-const ifHasStart = R.ifElse(R.has('start'));
-const ifHasEnd = R.ifElse(R.has('end'));
-const ifHasDuration = R.ifElse(R.has('duration'));
-const queryIsSplittable = (query: IGoalQuery) => query.goal.kind === GoalKind.Splittable;
-const qStart: toTBToNumber = (t: keyof ITimeBoundary) => R.pathOr(0, ['start', t]);
-const qEnd: toTBToNumber = (t: keyof ITimeBoundary) => R.pathOr(0, ['end', t]);
-const qDuration: toTimeDur = R.pathOr({ min: 0, target: 0 }, ['duration']);
-const gQuantity: toTimeDur = R.pathOr({ min: 0, target: 0 }, ['goal', 'quantity']);
-const gQuantityTarget: toNumber = R.pipe(gQuantity, R.pathOr(1, ['target']) as toNumber);
-const gtime: toNumber = R.pathOr(0, ['goal', 'time']);
-
-const goalToDuration = R.ifElse(queryIsSplittable, gQuantity, qDuration);
-const goalToTimeloop = R.ifElse(
-  queryIsSplittable,
-  gtime,
-  R.converge(R.divide, [gtime, gQuantityTarget])
-);
-
-const goalToSubpipes = (config: IConfig, query: IGoalQuery): IRange[] => {
-  const start = config.startDate;
-  const timeloop = goalToTimeloop(query);
-  const maxDuration = config.endDate - config.startDate;
-  const subpipeCount = Math.floor(maxDuration / timeloop);
-  return R.times(
-    i => ({ start: start + timeloop * i, end: start + timeloop * (i + 1) }),
-    subpipeCount
-  );
-};
-
-export const goalToPotentiality = (config: IConfig) => (query: IGoalQuery): IPotentiality[] => {
-  const duration = goalToDuration(query);
-  const subpipes = goalToSubpipes(config, query);
-  return subpipes.map((mask, i) => ({
-    duration,
-    isSplittable: queryIsSplittable(query),
-    places: [mask],
-    potentialId: i,
-    pressure: -1,
-    queryId: query.id,
-  }));
-};
-
-const atomicToDurationNb = (tStart: keyof ITimeBoundary, tEnd: keyof ITimeBoundary) =>
-  R.converge(R.subtract, [qEnd(tEnd), qStart(tStart)]);
-
-const atomicToDuration = ifHasDuration(
-  qDuration,
-  R.applySpec<ITimeDuration>({
-    min: atomicToDurationNb('max', 'min'),
-    target: atomicToDurationNb('target', 'target'),
-  })
-);
+const atomicToDuration = (q: IQuery) => q.position.duration;
 
 /**
  * TODO: sanitize queries -> all timeBoundary's fields are mandatory
@@ -175,7 +127,7 @@ const shiftWithTimeBoundary = (shift: ITimeBoundary, origin: number) => ({
 });
 
 export const linkToMask = (materials: ReadonlyArray<IMaterial>, config: IConfig) => (
-  query: IAtomicQuery
+  query: IQuery
 ): ReadonlyArray<IRange> => {
   if (!query.links) {
     return [{ end: config.endDate, start: config.startDate }];
@@ -199,17 +151,108 @@ export const linkToMask = (materials: ReadonlyArray<IMaterial>, config: IConfig)
     .reduce((a, b) => intersect(a, b));
 };
 
-const atomicToChildren = (c: IConfig) =>
-  R.applySpec<IRange>({
-    end: ifHasEnd(qEnd('target'), R.always(c.endDate)),
-    start: ifHasStart(qStart('target'), R.always(c.startDate)),
-  });
-
-export const atomicToPotentiality = (config: IConfig) => (query: IAtomicQuery): IPotentiality[] => {
-  const duration = atomicToDuration(query) as ITimeDuration;
-  const place = atomicToChildren(config)(query);
-  const queryId = query.id;
+const specifyCorrectKind = (splitted: IPotRange[]): IPotRange[] => {
+  const firstP = splitted[0];
+  const pressure = firstP.pressureStart;
+  const sndP = splitted[1];
+  const kind = firstP.kind;
+  if (splitted.length === 1) {
+    return [
+      {
+        ...firstP,
+        pressureEnd: kind === 'start' ? pressure : 0,
+        pressureStart: kind === 'start' ? 0 : pressure,
+      },
+    ];
+  }
   return [
-    { isSplittable: false, places: [place], duration, queryId, pressure: -1, potentialId: 0 },
+    { ...firstP, kind: `${firstP.kind}-before`, pressureEnd: pressure, pressureStart: 0 } as any,
+    { ...sndP, kind: `${sndP.kind}-after`, pressureEnd: -pressure, pressureStart: 0 },
   ];
+};
+
+/**
+ * When place has [0-100] with pressure [0-1] (target to 98 (duration: 2))
+ * and mask is [30-40]
+ * it results in [0-30] with pressure [1-1]
+ * and [40-100] with pressure [0-1]
+ *
+ * But pressure should be [0-.3] [.4-1]
+ *
+ * refBound: [0-100]
+ * bound: [30-40]
+ * position: start target: 98 / end target: 100
+ * pressure: 1
+ *
+ * compute places for refBound, then, intersect with bound
+ */
+export const atomicToPlaces = (
+  refBound: IRange,
+  bound: IRange,
+  position: IQueryPositionDurationInternal,
+  pressure: number
+): IPotRange[] => {
+  const endRange: IPotRange[] = specifyCorrectKind(
+    split<IPotRange>(position.end && position.end.target ? [position.end.target] : [], [{
+      end: propOrDefault(refBound.end, position.end, ['max']) as number,
+      kind: 'end',
+      pressureEnd: pressure,
+      pressureStart: pressure,
+      start: propOrDefault(refBound.start, position.end, ['min']) as number,
+    }])
+  );
+  const startRange: IPotRange[] = specifyCorrectKind(
+    split<IPotRange>(position.start && position.start.target ? [position.start.target] : [], [{
+      end: propOrDefault(refBound.end, position.start, ['max']) as number,
+      kind: 'start',
+      pressureEnd: pressure,
+      pressureStart: pressure,
+      start: propOrDefault(refBound.start, position.start, ['min']) as number,
+    }])
+  );
+  return [...startRange, ...endRange].map(adjustSplittedPlacePressure(bound));
+};
+
+/**
+ * When stripped with bound, should conserve before/after potPlaces
+ * start-before: 0-3 ; start-after: 3-10
+ * bound: 4-7:
+ * result: start-before: 4-4 (cross pressure > pressure); start-after: 4-7
+ * bound: 0-2:
+ * result: start-before: 0-2 (0-cross pressure < pressure); start-after: 2-2
+ *
+ */
+const adjustSplittedPlacePressure = (bound: IRange) => (place: IPotRange): IPotRange => {
+  const seg = chunkToSeg(place);
+  const end = Math.min(bound.end, Math.max(place.end, bound.start));
+  const start = Math.min(bound.end, Math.max(place.start, bound.start));
+  const pressureEnd =
+    place.end > end
+      ? defaultIfNaN(place.pressureEnd)(getYfromStartEndLine(seg, end))
+      : place.pressureEnd;
+  const pressureStart =
+    place.start < start
+      ? defaultIfNaN(place.pressureStart)(getYfromStartEndLine(seg, start))
+      : place.pressureStart;
+
+  return {
+    ...place,
+    end,
+    pressureEnd,
+    pressureStart,
+    start,
+  };
+};
+
+export const queryToPotentiality = (query: IQuery): IPotentiality => {
+  const duration = atomicToDuration(query) as ITimeDurationInternal;
+  const queryId = query.id;
+  return {
+    duration,
+    isSplittable: query.splittable,
+    places: [],
+    potentialId: 0,
+    pressure: -1,
+    queryId,
+  };
 };

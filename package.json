@@ -13,6 +13,7 @@
     "doc": "npm run build && typedoc --out docs/ dist/",
     "prepublishOnly": "npm run build",
     "semantic-release": "semantic-release",
+    "fix": "tslint --fix -p ./",
     "watch:ts": "tsc -w",
     "watch:ava": "ava -w build/**/*.test.js",
     "watch:test": "concurrently -k -p \"[{name}]\" -n \"TypeScript,Ava\" -c \"blue.bold,magenta.bold\" \"npm run watch:ts\" \"npm run watch:ava\""
@@ -37,13 +38,13 @@
   "homepage": "https://github.com/AutoScheduleJS/queries-scheduler#readme",
   "dependencies": {
     "@autoschedule/queries-fn": "^6.2.1",
-    "@autoschedule/userstate-manager": "^3.1.0",
     "intervals-fn": "^3.0.2",
     "moment": "^2.22.2",
     "ramda": "^0.25.0",
     "rxjs": "^6.2.1"
   },
   "devDependencies": {
+    "@autoschedule/userstate-manager": "^3.1.1",
     "@semantic-release/release-notes-generator": "^6.0.12",
     "@types/ramda": "github:types/npm-ramda#dist",
     "ava": "^0.25.0",
@@ -51,11 +52,12 @@
     "cz-conventional-changelog": "^2.1.0",
     "nyc": "^12.0.2",
     "prettier": "^1.13.6",
+    "rxjs-tslint": "^0.1.5",
     "semantic-release": "^15.6.0",
     "tslint": "^5.10.0",
     "tslint-config-prettier": "^1.13.0",
     "typedoc": "^0.11.1",
-    "typescript": "^2.8.2"
+    "typescript": "~2.8.4"
   },
   "config": {
     "commitizen": {

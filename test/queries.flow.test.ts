@@ -1,19 +1,43 @@
 import * as Q from '@autoschedule/queries-fn';
-import test from 'ava';
-
+import test, { TestContext } from 'ava';
 import {
-  atomicToPotentiality,
-  goalToPotentiality,
+  atomicToPlaces,
   linkToMask,
   mapToHourRange,
   mapToMonthRange,
   mapToTimeRestriction,
   mapToWeekdayRange,
-} from './queries.flow';
+  queryToPotentiality,
+} from '../src/data-flows/queries.flow';
+import { configToRange } from '../src/data-flows/util.flow';
+import { IConfig } from '../src/data-structures/config.interface';
+import { IMaterial } from '../src/data-structures/material.interface';
+import { IPotRange } from '../src/data-structures/range.interface';
 
-import { IConfig } from '../data-structures/config.interface';
-import { IMaterial } from '../data-structures/material.interface';
-import { IPotentiality } from '../data-structures/potentiality.interface';
+const testPlaces = (t: TestContext, places: ReadonlyArray<IPotRange>, expected: IPotRange[]) => {
+  t.true(places.length >= 2);
+  places.forEach((place, i) => {
+    t.is(place.kind, expected[i].kind, `for: ${i}`);
+    t.is(place.end, expected[i].end, `for: ${i}`);
+    t.is(place.start, expected[i].start, `for: ${i}`);
+  });
+};
+
+const tinyToPotRange = (obj: {
+  s: number;
+  e: number;
+  k: any;
+  ps?: number;
+  pe?: number;
+}): IPotRange => {
+  return {
+    end: obj.e,
+    kind: obj.k,
+    pressureEnd: obj.pe || 0,
+    pressureStart: obj.ps || 0,
+    start: obj.s,
+  };
+};
 
 test('will map nothing when no timeRestrictions', t => {
   const start = new Date().setHours(0, 0, 0, 0);
@@ -29,6 +53,7 @@ test('will map nothing when no timeRestrictions', t => {
 });
 
 test('will map from hour timeRestrictions', t => {
+
   const start = new Date().setHours(0, 0, 0, 0);
   const end = start + 1 * 24 * 3600000;
   const tr1 = Q.timeRestriction(Q.RestrictionCondition.InRange, [[5, 13]]);
@@ -105,32 +130,133 @@ test('will map from month timeRestrictions when overlapping range', t => {
 
 test('will convert atomic to potentiality (start, duration)', t => {
   const config: IConfig = { startDate: 0, endDate: 10 };
-  const atomic: Q.IAtomicQuery = Q.queryFactory<Q.IAtomicQuery>(
-    Q.start(5),
-    Q.duration(Q.timeDuration(1))
+  const confRange = configToRange(config);
+  const atomic: Q.IQueryInternal = Q.queryFactory(Q.positionHelper(Q.start(5), Q.duration(1)));
+  const pots = {
+    ...queryToPotentiality(atomic),
+    places: [atomicToPlaces(confRange, confRange, atomic.position, 1)],
+  };
+  t.falsy(pots.isSplittable);
+  testPlaces(
+    t,
+    pots.places[0],
+    [
+      { s: 0, e: 5, k: 'start-before' },
+      { s: 5, e: 10, k: 'start-after' },
+      { s: 0, e: 10, k: 'end' },
+    ].map(tinyToPotRange)
   );
-  const pot = atomicToPotentiality(config)(atomic);
+  t.is(pots.duration.target, 1);
+});
 
-  t.is(pot.length, 1);
-  t.false(pot[0].isSplittable);
-  t.is(pot[0].places.length, 1);
-  t.is(pot[0].places[0].start, 5);
-  t.is(pot[0].places[0].end, 10);
-  t.is(pot[0].duration.target, 1);
+test('will convert atomic to potentiality (end, duration)', t => {
+  const config: IConfig = { startDate: 0, endDate: 10 };
+  const confRange = configToRange(config);
+  const atomic: Q.IQueryInternal = Q.queryFactory(Q.positionHelper(Q.end(6, 2, 8), Q.duration(1)));
+  const pots = {
+    ...queryToPotentiality(atomic),
+    places: [atomicToPlaces(confRange, confRange, atomic.position, 1)],
+  };
+  t.falsy(pots.isSplittable);
+  testPlaces(
+    t,
+    pots.places[0],
+    [
+      { s: 0, e: 10, k: 'start' },
+      { s: 2, e: 6, k: 'end-before' },
+      { s: 6, e: 8, k: 'end-after' },
+    ].map(tinyToPotRange)
+  );
+  t.is(pots.duration.target, 1);
 });
 
 test('will convert atomic to potentiality (start, end)', t => {
   const config: IConfig = { startDate: 0, endDate: 10 };
-  const atomic: Q.IAtomicQuery = Q.queryFactory<Q.IAtomicQuery>(Q.start(5), Q.end(6));
-  const pot = atomicToPotentiality(config)(atomic);
+  const confRange = configToRange(config);
+  const atomic: Q.IQueryInternal = Q.queryFactory(Q.positionHelper(Q.start(5), Q.end(6)));
+  const pots = {
+    ...queryToPotentiality(atomic),
+    places: [atomicToPlaces(confRange, confRange, atomic.position, 1)],
+  };
 
-  t.is(pot.length, 1);
-  t.false(pot[0].isSplittable);
-  t.is(pot[0].places.length, 1);
-  t.is(pot[0].places[0].start, 5);
-  t.is(pot[0].places[0].end, 6);
-  t.is(pot[0].duration.target, 1);
-  t.is(pot[0].duration.min, 1);
+  t.false(pots.isSplittable);
+  testPlaces(
+    t,
+    pots.places[0],
+    [
+      { s: 0, e: 5, k: 'start-before' },
+      { s: 5, e: 10, k: 'start-after' },
+      { s: 0, e: 6, k: 'end-before' },
+      { s: 6, e: 10, k: 'end-after' },
+    ].map(tinyToPotRange)
+  );
+  t.is(pots.duration.target, 1);
+  t.is(pots.duration.min, 1);
+});
+
+test('will convert atomic to pot (start, end) with actual range smaller than intrinsic range', t => {
+  const config: IConfig = { startDate: 0, endDate: 10 };
+  const confRange = configToRange(config);
+  const atomic: Q.IQueryInternal = Q.queryFactory(Q.positionHelper(Q.start(3), Q.end(6, 6, 6)));
+  const pots = {
+    ...queryToPotentiality(atomic),
+    places: [atomicToPlaces(confRange, { end: 7, start: 4 }, atomic.position, 1)],
+  };
+
+  t.false(pots.isSplittable);
+  t.true(pots.places[0].length === 3);
+  testPlaces(
+    t,
+    pots.places[0],
+    [
+      { s: 4, e: 4, k: 'start-before' },
+      { s: 4, e: 7, k: 'start-after' },
+      { s: 6, e: 6, k: 'end' },
+    ].map(tinyToPotRange)
+  );
+  t.is(pots.duration.target, 3);
+  t.is(pots.duration.min, 3);
+});
+
+test('will convert and handle min/max without target', t => {
+  const config: IConfig = { startDate: 0, endDate: 10 };
+  const confRange = configToRange(config);
+  const atomic: Q.IQueryInternal = Q.queryFactory(
+    Q.positionHelper(Q.start(undefined, 2, 6), Q.end(undefined, 4, 9), Q.duration(2, 1))
+  );
+  const pots = {
+    ...queryToPotentiality(atomic),
+    places: [atomicToPlaces(confRange, confRange, atomic.position, 1)],
+  };
+
+  t.false(pots.isSplittable);
+  testPlaces(
+    t,
+    pots.places[0],
+    [{ s: 2, e: 6, k: 'start' }, { s: 4, e: 9, k: 'end' }].map(tinyToPotRange)
+  );
+  t.is(pots.duration.target, 2);
+  t.is(pots.duration.min, 1);
+});
+
+test('will convert with minimal start/end', t => {
+  const config: IConfig = { startDate: 0, endDate: 10 };
+  const confRange = configToRange(config);
+  const atomic: Q.IQueryInternal = Q.queryFactory(
+    Q.positionHelper(Q.start(undefined, undefined, 4), Q.end(undefined, 6, undefined))
+  );
+  const pots = {
+    ...queryToPotentiality(atomic),
+    places: [atomicToPlaces(confRange, confRange, atomic.position, 1)],
+  };
+  t.false(pots.isSplittable);
+  testPlaces(
+    t,
+    pots.places[0],
+    [{ s: 0, e: 4, k: 'start' }, { s: 6, e: 10, k: 'end' }].map(tinyToPotRange)
+  );
+  t.is(pots.duration.target, 2);
+  t.is(pots.duration.min, 2);
 });
 
 test('will link to mask (one material) end', t => {
@@ -155,10 +281,7 @@ test('will link to mask (one material) end', t => {
     potentialId: 0,
     queryId: 0,
   };
-  const query = Q.queryFactory<Q.IAtomicQuery>(
-    Q.duration(Q.timeDuration(10, 5)),
-    Q.links(queryLink)
-  );
+  const query = Q.queryFactory(Q.positionHelper(Q.duration(10, 5)), Q.links([queryLink]));
   const result = linkToMask(materials, config)(query);
   t.is(result.length, 1);
   t.is(result[0].start, 10);
@@ -181,10 +304,7 @@ test('will link to mask (one material) start', t => {
     potentialId: 0,
     queryId: 0,
   };
-  const query = Q.queryFactory<Q.IAtomicQuery>(
-    Q.duration(Q.timeDuration(4, 2)),
-    Q.links(queryLink)
-  );
+  const query = Q.queryFactory(Q.positionHelper(Q.duration(4, 2)), Q.links([queryLink]));
   const result = linkToMask(materials, config)(query);
   t.is(result.length, 1);
   t.is(result[0].start, 5);
@@ -213,10 +333,7 @@ test('will link to mask (potential with multiples places) end', t => {
     potentialId: 0,
     queryId: 0,
   };
-  const query = Q.queryFactory<Q.IAtomicQuery>(
-    Q.duration(Q.timeDuration(4, 2)),
-    Q.links(queryLink)
-  );
+  const query = Q.queryFactory(Q.positionHelper(Q.duration(4, 2)), Q.links([queryLink]));
   const result = linkToMask(materials, config)(query);
   t.is(result.length, 2);
   t.is(result[0].end, 19);
@@ -241,45 +358,25 @@ test('will link to mask (multiple links) end', t => {
     },
   ];
   const config: IConfig = { startDate: 0, endDate: 45 };
-  const query = Q.queryFactory<Q.IAtomicQuery>(
-    Q.duration(Q.timeDuration(4, 2)),
-    Q.links({
-      distance: { max: 10, min: 5, target: 8 },
-      origin: 'end',
-      potentialId: 0,
-      queryId: 0,
-    }, {
-      distance: { max: 5, min: 2, target: 3 },
-      origin: 'end',
-      potentialId: 0,
-      queryId: 1,
-    })
+  const query = Q.queryFactory(
+    Q.positionHelper(Q.duration(4, 2)),
+    Q.links([
+      {
+        distance: { max: 10, min: 5, target: 8 },
+        origin: 'end',
+        potentialId: 0,
+        queryId: 0,
+      },
+      {
+        distance: { max: 5, min: 2, target: 3 },
+        origin: 'end',
+        potentialId: 0,
+        queryId: 1,
+      },
+    ])
   );
   const result = linkToMask(materials, config)(query);
   t.is(result.length, 1);
   t.is(result[0].end, 34);
   t.is(result[0].start, 32);
-});
-
-test('will convert goal to potentiality', t => {
-  const config: IConfig = { startDate: 0, endDate: 10 };
-  const qgoal1: Q.IGoalQuery = Q.queryFactory<Q.IGoalQuery>(
-    Q.goal(Q.GoalKind.Atomic, Q.timeDuration(2), 5)
-  );
-  const qgoal2: Q.IGoalQuery = Q.queryFactory<Q.IGoalQuery>(
-    Q.goal(Q.GoalKind.Splittable, Q.timeDuration(2.5), 2.5)
-  );
-  const pot1 = goalToPotentiality(config)(qgoal1);
-  const pot2 = goalToPotentiality(config)(qgoal2);
-  const testPoten = (poten: IPotentiality[]) => {
-    t.is(poten.length, 4);
-    t.is(poten[0].places.length, 1);
-    t.is(poten[0].places[0].start, 0);
-    t.is(poten[0].places[0].end, 2.5);
-    t.is(poten[1].places.length, 1);
-    t.is(poten[1].places[0].start, 2.5);
-    t.is(poten[1].places[0].end, 5);
-  };
-  testPoten(pot1);
-  testPoten(pot2);
 });
