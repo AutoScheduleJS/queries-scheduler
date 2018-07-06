@@ -2,8 +2,9 @@
   "name": "@autoschedule/queries-scheduler",
   "version": "0.0.0-development",
   "description": "Queries scheduler",
-  "main": "dist/index.bundle.js",
-  "types": "dist/index.d.ts",
+  "main": "lib/index.js",
+  "types": "es/index.d.ts",
+  "module": "es/index.js",
   "scripts": {
     "ava": "ava build/**/*.test.js",
     "test": "tslint -p ./ && tsc && nyc --reporter=lcov npm run ava",
