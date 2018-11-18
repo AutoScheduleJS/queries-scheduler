@@ -41,7 +41,7 @@
     "@autoschedule/queries-fn": "^6.2.1",
     "intervals-fn": "^3.0.2",
     "moment": "^2.22.2",
-    "ramda": "^0.25.0",
+    "ramda": "^0.26.0",
     "rxjs": "^6.2.1"
   },
   "devDependencies": {
